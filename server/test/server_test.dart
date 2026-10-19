@@ -1,0 +1,477 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:kiosk_core/kiosk_core.dart';
+import 'package:kiosk_server/kiosk_server.dart';
+import 'package:shelf/shelf.dart';
+import 'package:test/test.dart';
+
+const pin = '1234';
+
+class FailingPrinter extends TicketPrinter {
+  @override
+  String get type => 'broken';
+  @override
+  int get width => 42;
+  @override
+  Future<void> printTicket(Ticket ticket) async =>
+      throw const SocketException('printer offline');
+}
+
+late KioskApp app;
+
+Future<(int, dynamic)> call(
+  String method,
+  String path, {
+  Object? body,
+  bool staff = false,
+}) async {
+  final res = await app.handler(
+    Request(
+      method,
+      Uri.parse('http://localhost$path'),
+      body: body == null ? null : jsonEncode(body),
+      headers: {
+        'content-type': 'application/json',
+        if (staff) 'x-staff-pin': pin,
+      },
+    ),
+  );
+  final text = await res.readAsString();
+  return (res.statusCode, text.isEmpty ? null : jsonDecode(text));
+}
+
+Future<void> configure(Map<String, Object?> patch) async {
+  final (status, body) = await call(
+    'PUT',
+    '/api/admin/settings',
+    body: patch,
+    staff: true,
+  );
+  expect(status, 200, reason: '$body');
+}
+
+Map<String, Object?> burgerMeal({int qty = 1}) => {
+  'productId': 'menu-classic',
+  'quantity': qty,
+  'optionIds': ['size-m', 'side-fries', 'drink-cola'],
+};
+
+Future<Map<String, dynamic>> placeOrder(
+  List<Map<String, Object?>> lines, {
+  String? paymentChoice,
+}) async {
+  final (status, body) = await call(
+    'POST',
+    '/api/orders',
+    body: {
+      'serviceMode': 'eatIn',
+      'language': 'it',
+      'lines': lines,
+      'paymentChoice': ?paymentChoice,
+    },
+  );
+  expect(status, 201, reason: '$body');
+  return body as Map<String, dynamic>;
+}
+
+void main() {
+  setUp(() {
+    final registry = AdapterRegistry()
+      ..printer['broken'] = (_) => FailingPrinter();
+    app = KioskApp(AppDatabase.inMemory(), registry: registry);
+  });
+  tearDown(() => app.close());
+
+  group('menu', () {
+    test('demo menu is served with allergens and placeholders', () async {
+      final (status, body) = await call('GET', '/api/menu');
+      expect(status, 200);
+      final menu = Menu.fromJson((body as Map).cast());
+      expect(menu.categories, hasLength(5));
+      final burger = menu.product('classic-burger')!;
+      expect(burger.allergens, contains(Allergen.gluten));
+      expect(burger.imageUrl, startsWith('/media/placeholder/'));
+    });
+
+    test('disabled products disappear from the kiosk menu', () async {
+      final (s, _) = await call(
+        'PATCH',
+        '/api/admin/products/brownie',
+        body: {'enabled': false},
+        staff: true,
+      );
+      expect(s, 200);
+      final (_, body) = await call('GET', '/api/menu');
+      expect(Menu.fromJson((body as Map).cast()).product('brownie'), isNull);
+    });
+
+    test('a product needs an existing category', () async {
+      final (status, body) = await call(
+        'POST',
+        '/api/admin/products',
+        body: {
+          'name': {'it': 'Test'},
+          'categoryId': 'nope',
+          'priceCents': 100,
+        },
+        staff: true,
+      );
+      expect(status, 400);
+      expect(body['error'], 'unknownCategory');
+    });
+
+    test('placeholder images are generated', () async {
+      final res = await app.handler(
+        Request(
+          'GET',
+          Uri.parse('http://localhost/media/placeholder/Logo.svg'),
+        ),
+      );
+      expect(res.statusCode, 200);
+      expect(await res.readAsString(), contains('<svg'));
+    });
+  });
+
+  group('orders', () {
+    test('prices come from the server menu, not the client', () async {
+      final order = await placeOrder([
+        {...burgerMeal(qty: 2), 'unitPriceCents': 1},
+        {
+          'productId': 'fries',
+          'optionIds': ['sauce-mayo'],
+        },
+      ]);
+      expect(order['totalCents'], 990 * 2 + 300 + 30);
+      expect(order['number'], 1);
+      final next = await placeOrder([burgerMeal()]);
+      expect(next['number'], 2);
+    });
+
+    test('required option groups are enforced', () async {
+      final (status, body) = await call(
+        'POST',
+        '/api/orders',
+        body: {
+          'serviceMode': 'eatIn',
+          'lines': [
+            {
+              'productId': 'menu-classic',
+              'optionIds': ['size-m'],
+            },
+          ],
+        },
+      );
+      expect(status, 400);
+      expect(body['error'], 'invalidOptions');
+    });
+
+    test('options of another product are rejected', () async {
+      final (status, body) = await call(
+        'POST',
+        '/api/orders',
+        body: {
+          'serviceMode': 'eatIn',
+          'lines': [
+            {
+              'productId': 'water',
+              'optionIds': ['extra-bacon'],
+            },
+          ],
+        },
+      );
+      expect(status, 400);
+      expect(body['error'], 'invalidOptions');
+    });
+
+    test('sold out products cannot be ordered', () async {
+      await call(
+        'PATCH',
+        '/api/kitchen/products/water',
+        body: {'soldOut': true},
+        staff: true,
+      );
+      final (status, body) = await call(
+        'POST',
+        '/api/orders',
+        body: {
+          'serviceMode': 'eatIn',
+          'lines': [
+            {'productId': 'water'},
+          ],
+        },
+      );
+      expect(status, 400);
+      expect(body['error'], 'soldOut');
+    });
+  });
+
+  group('flows', () {
+    test('order only: ticket for the till, closed when paid', () async {
+      await configure({'flow': FlowConfig.orderOnly.toJson()});
+      final order = await placeOrder([burgerMeal()]);
+      expect(order['paymentStatus'], 'awaitingCounter');
+      expect(order['kitchenStatus'], 'none');
+
+      final (_, jobs) = await call('GET', '/api/staff/print-jobs', staff: true);
+      expect(jobs['jobs'], hasLength(1));
+      expect(jobs['jobs'][0]['content'], contains('Paga in cassa'));
+
+      final (s, paid) = await call(
+        'POST',
+        '/api/staff/orders/${order['id']}/mark-paid',
+        staff: true,
+      );
+      expect(s, 200);
+      expect(paid['status'], 'completed');
+    });
+
+    test('pay at counter, kitchen after payment, pickup when ready', () async {
+      final order = await placeOrder([burgerMeal()]);
+      final id = order['id'];
+      var (_, queue) = await call('GET', '/api/kitchen/orders', staff: true);
+      expect(queue['orders'], isEmpty);
+
+      await call('POST', '/api/staff/orders/$id/mark-paid', staff: true);
+      (_, queue) = await call('GET', '/api/kitchen/orders', staff: true);
+      expect(queue['orders'], hasLength(1));
+
+      final events = <String>[];
+      final sub = app.bus.stream.listen((e) => events.add(e.type));
+      await call(
+        'POST',
+        '/api/kitchen/orders/$id/status',
+        body: {'status': 'ready'},
+        staff: true,
+      );
+      final (_, done) = await call(
+        'POST',
+        '/api/kitchen/orders/$id/status',
+        body: {'status': 'collected'},
+        staff: true,
+      );
+      await sub.cancel();
+      expect(events, contains(ServerEvent.pickupAnnounce));
+      expect(done['status'], 'completed');
+    });
+
+    test('full service in demo mode: simulated payment and receipt', () async {
+      await configure({
+        'flow': FlowConfig.fullService.toJson(),
+        'payment': {
+          'type': 'demo',
+          'options': {'delayMs': 0},
+        },
+      });
+      final order = await placeOrder([burgerMeal()]);
+      expect(order['paymentStatus'], 'awaitingKiosk');
+      expect(order['isDemo'], isTrue);
+
+      final (s, paid) = await call('POST', '/api/orders/${order['id']}/pay');
+      expect(s, 200);
+      expect(paid['paymentStatus'], 'paid');
+      expect(paid['kitchenStatus'], 'queued');
+      expect(paid['fiscalDocument']['number'], startsWith('DEMO-'));
+
+      final (s2, _) = await call('POST', '/api/orders/${order['id']}/pay');
+      expect(s2, 409, reason: 'no double charge');
+    });
+
+    test('declined payment can fall back to the counter', () async {
+      await configure({
+        'flow': FlowConfig.fullService.toJson(),
+        'payment': {
+          'type': 'demo',
+          'options': {'delayMs': 0, 'declineCentsSuffix': '90'},
+        },
+      });
+      final order = await placeOrder([burgerMeal()]); // 9,90 -> declined
+      final id = order['id'];
+      final (_, failed) = await call('POST', '/api/orders/$id/pay');
+      expect(failed['paymentStatus'], 'failed');
+
+      final (s, switched) = await call(
+        'POST',
+        '/api/orders/$id/switch-to-counter',
+      );
+      expect(s, 200);
+      expect(switched['paymentStatus'], 'awaitingCounter');
+
+      final (_, paid) = await call(
+        'POST',
+        '/api/staff/orders/$id/mark-paid',
+        body: {'issueFiscal': false},
+        staff: true,
+      );
+      expect(paid['paymentStatus'], 'paid');
+      expect(paid['fiscalDocument'], isNull);
+      expect(paid['kitchenStatus'], 'queued');
+    });
+
+    test('no payment: straight to the kitchen', () async {
+      await configure({
+        'flow': {
+          'paymentMode': 'none',
+          'rules': {
+            'submitted': ['sendToKitchenDisplay'],
+          },
+        },
+      });
+      final order = await placeOrder([burgerMeal()]);
+      expect(order['paymentStatus'], 'notRequired');
+      expect(order['kitchenStatus'], 'queued');
+      final (s, _) = await call('POST', '/api/orders/${order['id']}/pay');
+      expect(s, 409);
+    });
+
+    test('customer choice needs the choice', () async {
+      await configure({
+        'flow': {
+          'paymentMode': 'customerChoice',
+          'rules': {
+            'submitted': ['printCustomerTicket'],
+            'paid': ['sendToKitchenDisplay'],
+          },
+        },
+      });
+      final (status, body) = await call(
+        'POST',
+        '/api/orders',
+        body: {
+          'serviceMode': 'eatIn',
+          'lines': [burgerMeal()],
+        },
+      );
+      expect(status, 400);
+      expect(body['error'], 'paymentChoiceRequired');
+      final order = await placeOrder([burgerMeal()], paymentChoice: 'kiosk');
+      expect(order['paymentStatus'], 'awaitingKiosk');
+    });
+
+    test(
+      'a broken printer never blocks the order, and can be retried',
+      () async {
+        await configure({
+          'customerPrinter': {'type': 'broken'},
+        });
+        final order = await placeOrder([burgerMeal()]);
+        final history = (order['history'] as List).map((e) => e['type']);
+        expect(history, contains('actionFailed'));
+
+        await configure({
+          'customerPrinter': {'type': 'demo'},
+        });
+        final (s, retried) = await call(
+          'POST',
+          '/api/staff/orders/${order['id']}/actions/printCustomerTicket',
+          staff: true,
+        );
+        expect(s, 200);
+        expect(
+          (retried['history'] as List).last['detail'],
+          'manual:printCustomerTicket',
+        );
+      },
+    );
+
+    test('invalid flows are refused', () async {
+      final (status, body) = await call(
+        'PUT',
+        '/api/admin/settings',
+        body: {
+          'flow': {
+            'paymentMode': 'counter',
+            'rules': {
+              'submitted': ['issueFiscalDocument'],
+            },
+          },
+        },
+        staff: true,
+      );
+      expect(status, 400);
+      expect(body['error'], 'invalidSettings');
+    });
+  });
+
+  group('stock', () {
+    Future<void> trackWater(int qty) => call(
+      'PUT',
+      '/api/admin/products/water',
+      body: {
+        ...app.menu.fullMenu().product('water')!.toJson(),
+        'trackStock': true,
+        'stockQty': qty,
+      },
+      staff: true,
+    );
+
+    test('is enforced in production and restored on cancel', () async {
+      await configure({
+        'demoMode': false,
+        'stockTracking': true,
+        'flow': FlowConfig.orderOnly.toJson(),
+      });
+      await trackWater(2);
+      final order = await placeOrder([
+        {'productId': 'water', 'quantity': 2},
+      ]);
+      expect(app.menu.fullMenu().product('water')!.soldOut, isTrue);
+
+      final (status, body) = await call(
+        'POST',
+        '/api/orders',
+        body: {
+          'serviceMode': 'eatIn',
+          'lines': [
+            {'productId': 'water'},
+          ],
+        },
+      );
+      expect(status, 400);
+      expect(body['error'], 'soldOut');
+
+      await call('POST', '/api/orders/${order['id']}/cancel');
+      final water = app.menu.fullMenu().product('water')!;
+      expect(water.stockQty, 2);
+      expect(water.soldOut, isFalse);
+    });
+
+    test('is ignored in demo mode', () async {
+      await configure({'stockTracking': true});
+      await trackWater(0);
+      await placeOrder([
+        {'productId': 'water', 'quantity': 3},
+      ]);
+      expect(app.menu.fullMenu().product('water')!.stockQty, 0);
+    });
+  });
+
+  group('security', () {
+    test('staff endpoints need the PIN', () async {
+      final (s1, _) = await call('GET', '/api/kitchen/orders');
+      expect(s1, 401);
+      final (s2, _) = await call('GET', '/api/admin/settings');
+      expect(s2, 401);
+      final (s3, body) = await call('GET', '/api/settings');
+      expect(s3, 200);
+      expect((body as Map).containsKey('adminPin'), isFalse);
+    });
+
+    test('the kiosk cannot cancel a paid order', () async {
+      final order = await placeOrder([burgerMeal()]);
+      await call(
+        'POST',
+        '/api/staff/orders/${order['id']}/mark-paid',
+        staff: true,
+      );
+      final (s, body) = await call('POST', '/api/orders/${order['id']}/cancel');
+      expect(s, 409);
+      expect(body['error'], 'cannotCancel');
+    });
+  });
+
+  test('ESC/POS encoding maps € and accented letters to PC858', () {
+    final bytes = EscPosEncoder(42).encode(const Ticket([TicketText('è 1€')]));
+    expect(bytes, containsAllInOrder([0x8a, 0x20, 0x31, 0xd5]));
+  });
+}

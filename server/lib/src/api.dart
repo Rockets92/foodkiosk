@@ -1,0 +1,354 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:kiosk_core/kiosk_core.dart';
+import 'package:shelf/shelf.dart';
+import 'package:shelf_router/shelf_router.dart';
+import 'package:shelf_web_socket/shelf_web_socket.dart';
+
+import 'adapters/registry.dart';
+import 'errors.dart';
+import 'event_bus.dart';
+import 'menu_service.dart';
+import 'order_service.dart';
+import 'placeholder.dart';
+import 'repositories.dart';
+import 'settings_service.dart';
+
+const _json = {'content-type': 'application/json; charset=utf-8'};
+
+Response _ok(Object? body, {int status = 200}) =>
+    Response(status, body: jsonEncode(body), headers: _json);
+
+Future<Map<String, Object?>> _body(Request req) async {
+  final text = await req.readAsString();
+  if (text.trim().isEmpty) return {};
+  try {
+    final decoded = jsonDecode(text);
+    if (decoded is Map) return decoded.cast();
+  } on FormatException {
+    // fall through
+  }
+  throw ApiException.badRequest(
+    'invalidJson',
+    'The body must be a JSON object.',
+  );
+}
+
+/// Server events that anyone on the network may receive (kiosks, pickup
+/// screen). Order details are only streamed to authenticated staff.
+const _publicEvents = {
+  ServerEvent.menuUpdated,
+  ServerEvent.settingsUpdated,
+  ServerEvent.pickupAnnounce,
+};
+
+class Api {
+  final SettingsService settings;
+  final MenuService menu;
+  final OrderService orders;
+  final PrintJobRepository printJobs;
+  final AdapterRegistry registry;
+  final EventBus bus;
+  final Handler? mediaHandler;
+
+  Api({
+    required this.settings,
+    required this.menu,
+    required this.orders,
+    required this.printJobs,
+    required this.registry,
+    required this.bus,
+    this.mediaHandler,
+  });
+
+  bool _isStaff(Request req) {
+    final pin = req.headers['x-staff-pin'] ?? req.url.queryParameters['pin'];
+    return pin != null && pin == settings.current.adminPin;
+  }
+
+  Middleware get _staffOnly =>
+      (inner) => (req) {
+        if (!_isStaff(req)) {
+          return _ok({
+            'error': 'unauthorized',
+            'message': 'Staff PIN required.',
+          }, status: 401);
+        }
+        return inner(req);
+      };
+
+  Handler get handler {
+    final staffHandler = const Pipeline()
+        .addMiddleware(_staffOnly)
+        .addHandler(_staffRouter().call);
+
+    // Unknown public routes fall through to the PIN-protected ones.
+    final public = Router(notFoundHandler: staffHandler)
+      ..get('/health', (Request _) => _ok({'status': 'ok'}))
+      ..get('/settings', (Request _) => _ok(settings.current.toPublicJson()))
+      ..get('/menu', (Request _) => _ok(menu.kioskMenu().toJson()))
+      ..get(
+        '/allergens',
+        (Request _) => _ok({
+          'allergens': [
+            for (final a in Allergen.values)
+              {'code': a.name, 'label': a.label.toJson()},
+          ],
+          'tags': [
+            for (final t in DietaryTag.values)
+              {'code': t.name, 'label': t.label.toJson()},
+          ],
+        }),
+      )
+      ..post('/orders', (Request req) async {
+        final body = await _body(req);
+        final order = await orders.create(OrderRequest.fromJson(body));
+        return _ok(order.toJson(), status: 201);
+      })
+      ..get(
+        '/orders/<id>',
+        (Request _, String id) => _ok(orders.get(id).toJson()),
+      )
+      ..post(
+        '/orders/<id>/pay',
+        (Request _, String id) async =>
+            _ok((await orders.payOnKiosk(id)).toJson()),
+      )
+      ..post(
+        '/orders/<id>/switch-to-counter',
+        (Request _, String id) async =>
+            _ok((await orders.switchToCounter(id)).toJson()),
+      )
+      ..post(
+        '/orders/<id>/cancel',
+        (Request _, String id) async =>
+            _ok((await orders.cancel(id, byStaff: false)).toJson()),
+      );
+
+    final root = Router()
+      ..get('/ws', _webSocket)
+      ..get(
+        '/media/placeholder/<name>',
+        (Request _, String name) => Response.ok(
+          placeholderSvg(name),
+          headers: {
+            'content-type': 'image/svg+xml',
+            'cache-control': 'max-age=86400',
+          },
+        ),
+      )
+      ..mount('/api/', public.call);
+    if (mediaHandler case final media?) root.mount('/media/', media);
+
+    return const Pipeline()
+        .addMiddleware(_cors)
+        .addMiddleware(_errors)
+        .addHandler(root.call);
+  }
+
+  Router _staffRouter() {
+    return Router()
+      ..get(
+        '/kitchen/orders',
+        (Request _) => _ok({
+          'orders': [for (final o in orders.kitchenQueue()) o.toJson()],
+        }),
+      )
+      ..post('/kitchen/orders/<id>/status', (Request req, String id) async {
+        final body = await _body(req);
+        final status = KitchenStatus.values
+            .where((s) => s.name == body['status'])
+            .firstOrNull;
+        if (status == null) {
+          throw ApiException.badRequest(
+            'invalidStatus',
+            'Unknown kitchen status.',
+          );
+        }
+        return _ok((await orders.setKitchenStatus(id, status)).toJson());
+      })
+      ..patch('/kitchen/products/<id>', (Request req, String id) async {
+        final body = await _body(req);
+        return _ok(
+          menu.patchProduct(id, soldOut: body['soldOut'] as bool?).toJson(),
+        );
+      })
+      ..get('/staff/orders', _listOrders)
+      ..post('/staff/orders/<id>/mark-paid', (Request req, String id) async {
+        final body = await _body(req);
+        return _ok(
+          (await orders.markPaid(
+            id,
+            method: body['method'] as String? ?? 'counter',
+            issueFiscal: body['issueFiscal'] as bool? ?? true,
+          )).toJson(),
+        );
+      })
+      ..post('/staff/orders/<id>/cancel', (Request req, String id) async {
+        final body = await _body(req);
+        return _ok(
+          (await orders.cancel(
+            id,
+            byStaff: true,
+            reason: body['reason'] as String?,
+          )).toJson(),
+        );
+      })
+      ..post('/staff/orders/<id>/actions/<action>', (
+        Request _,
+        String id,
+        String action,
+      ) async {
+        final a =
+            FlowAction.tryParse(action) ??
+            (throw ApiException.badRequest('unknownAction', 'Unknown action.'));
+        return _ok((await orders.runAction(id, a)).toJson());
+      })
+      ..get(
+        '/staff/print-jobs',
+        (Request req) => _ok({
+          'jobs': [
+            for (final j in printJobs.recent(
+              orderId: req.url.queryParameters['orderId'],
+            ))
+              j.toJson(),
+          ],
+        }),
+      )
+      ..get('/admin/settings', (Request _) => _ok(settings.current.toJson()))
+      ..put('/admin/settings', (Request req) async {
+        final body = await _body(req);
+        final next = KioskSettings.fromJson({
+          ...settings.current.toJson(),
+          ...body,
+        });
+        return _ok(settings.update(next).toJson());
+      })
+      ..get(
+        '/admin/flow/presets',
+        (Request _) => _ok({
+          for (final e in FlowConfig.presets.entries) e.key: e.value.toJson(),
+        }),
+      )
+      ..post('/admin/flow/validate', (Request req) async {
+        final flow = FlowConfig.fromJson(await _body(req));
+        return _ok({
+          'valid': flow.isValid,
+          'issues': [for (final i in flow.validate()) i.toJson()],
+        });
+      })
+      ..get('/admin/adapters', (Request _) => _ok(registry.describe()))
+      ..get('/admin/menu', (Request _) => _ok(menu.fullMenu().toJson()))
+      ..post(
+        '/admin/categories',
+        (Request req) async =>
+            _ok(menu.saveCategory(await _body(req)).toJson(), status: 201),
+      )
+      ..put(
+        '/admin/categories/<id>',
+        (Request req, String id) async =>
+            _ok(menu.saveCategory(await _body(req), id: id).toJson()),
+      )
+      ..delete('/admin/categories/<id>', (Request _, String id) {
+        menu.deleteCategory(id);
+        return Response(204);
+      })
+      ..post(
+        '/admin/products',
+        (Request req) async =>
+            _ok(menu.saveProduct(await _body(req)).toJson(), status: 201),
+      )
+      ..put(
+        '/admin/products/<id>',
+        (Request req, String id) async =>
+            _ok(menu.saveProduct(await _body(req), id: id).toJson()),
+      )
+      ..patch('/admin/products/<id>', (Request req, String id) async {
+        final b = await _body(req);
+        return _ok(
+          menu
+              .patchProduct(
+                id,
+                soldOut: b['soldOut'] as bool?,
+                enabled: b['enabled'] as bool?,
+                stockQty: b['stockQty'] as int?,
+              )
+              .toJson(),
+        );
+      })
+      ..delete('/admin/products/<id>', (Request _, String id) {
+        menu.deleteProduct(id);
+        return Response(204);
+      })
+      ..post(
+        '/admin/modifier-groups',
+        (Request req) async =>
+            _ok(menu.saveModifierGroup(await _body(req)).toJson(), status: 201),
+      )
+      ..put(
+        '/admin/modifier-groups/<id>',
+        (Request req, String id) async =>
+            _ok(menu.saveModifierGroup(await _body(req), id: id).toJson()),
+      )
+      ..delete('/admin/modifier-groups/<id>', (Request _, String id) {
+        menu.deleteModifierGroup(id);
+        return Response(204);
+      });
+  }
+
+  Response _listOrders(Request req) {
+    final q = req.url.queryParameters;
+    return _ok({
+      'orders': [
+        for (final o in orders.query(
+          businessDay: q['day'] ?? OrderRepository.businessDay(DateTime.now()),
+          number: int.tryParse(q['number'] ?? ''),
+          status: q['status'] == null ? null : OrderStatus.parse(q['status']!),
+          paymentStatus: q['payment'] == null
+              ? null
+              : PaymentStatus.parse(q['payment']!),
+        ))
+          o.toJson(),
+      ],
+    });
+  }
+
+  FutureOr<Response> _webSocket(Request req) {
+    final staff = _isStaff(req);
+    return webSocketHandler((channel, _) {
+      final sub = bus.stream
+          .where((e) => staff || _publicEvents.contains(e.type))
+          .listen((e) => channel.sink.add(jsonEncode(e.toJson())));
+      channel.stream.listen(
+        (_) {},
+        onDone: sub.cancel,
+        onError: (_) => sub.cancel(),
+      );
+    })(req);
+  }
+}
+
+Middleware get _errors =>
+    (inner) => (req) async {
+      try {
+        return await inner(req);
+      } on ApiException catch (e) {
+        return _ok(e.toJson(), status: e.status);
+      }
+    };
+
+const _corsHeaders = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  'access-control-allow-headers': 'content-type, x-staff-pin',
+};
+
+Middleware get _cors =>
+    (inner) => (req) async {
+      if (req.method == 'OPTIONS') {
+        return Response.ok('', headers: _corsHeaders);
+      }
+      final res = await inner(req);
+      return res.change(headers: _corsHeaders);
+    };

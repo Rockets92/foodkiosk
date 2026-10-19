@@ -1,0 +1,12 @@
+.dart_tool/
+build/
+*.iml
+.idea/
+.vscode/
+pubspec_overrides.yaml
+# runtime data of the local server
+server/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

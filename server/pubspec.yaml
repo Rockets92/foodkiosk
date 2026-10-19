@@ -1,0 +1,25 @@
+name: kiosk_server
+description: Local backend for the Food Kiosk suite (menu, orders, kitchen, payments, printing).
+publish_to: none
+version: 0.1.0
+resolution: workspace
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  args: ^2.5.0
+  kiosk_core:
+    path: ../packages/kiosk_core
+  path: ^1.9.0
+  shelf: ^1.4.1
+  shelf_router: ^1.1.4
+  shelf_static: ^1.1.2
+  shelf_web_socket: ^3.0.0
+  sqlite3: ^3.0.0
+  web_socket_channel: ^3.0.0
+
+dev_dependencies:
+  http: ^1.2.0
+  lints: ^6.0.0
+  test: ^1.25.0
