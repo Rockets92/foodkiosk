@@ -16,6 +16,12 @@ Future<void> main(List<String> args) async {
       defaultsTo: 'data',
       help: 'Folder for the database and uploaded media.',
     )
+    ..addOption(
+      'kiosk-web',
+      help:
+          'Folder with the kiosk web build, served at /kiosk/ '
+          '(flutter build web --base-href /kiosk/).',
+    )
     ..addFlag(
       'no-demo-menu',
       negatable: false,
@@ -37,9 +43,21 @@ Future<void> main(List<String> args) async {
     mediaHandler: createStaticHandler(mediaDir.path),
   );
 
-  final handler = const Pipeline()
-      .addMiddleware(logRequests())
-      .addHandler(app.handler);
+  final kioskWeb = opts['kiosk-web'] as String?;
+  final kioskHandler = kioskWeb == null
+      ? null
+      : createStaticHandler(kioskWeb, defaultDocument: 'index.html');
+  final handler = const Pipeline().addMiddleware(logRequests()).addHandler((
+    Request req,
+  ) {
+    if (kioskHandler != null && req.url.path == 'kiosk') {
+      return Response.found('/kiosk/');
+    }
+    if (kioskHandler != null && req.url.path.startsWith('kiosk/')) {
+      return kioskHandler(req.change(path: 'kiosk'));
+    }
+    return app.handler(req);
+  });
   final server = await io.serve(
     handler,
     opts['host'] as String,
@@ -50,6 +68,9 @@ Future<void> main(List<String> args) async {
     'Food Kiosk server on http://${server.address.host}:${server.port}',
   );
   stdout.writeln('  data:  ${p.absolute(dataDir.path)}');
+  if (kioskWeb != null) {
+    stdout.writeln('  kiosk: http://localhost:${server.port}/kiosk/');
+  }
   stdout.writeln(
     '  mode:  ${s.demoMode ? 'DEMO (payments simulated)' : 'production'}',
   );

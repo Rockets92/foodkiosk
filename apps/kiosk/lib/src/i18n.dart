@@ -1,0 +1,161 @@
+import 'package:kiosk_core/kiosk_core.dart';
+
+/// UI texts of the kiosk. Menu content has its own translations in the
+/// menu data; these are only the fixed labels.
+///
+/// To add a language, add a map here with the same keys and enable the
+/// language code in the server settings. Missing keys fall back to Italian.
+const _strings = <String, Map<String, String>>{
+  'it': {
+    'languageName': 'Italiano',
+    'touchToOrder': 'Tocca per ordinare',
+    'welcome': 'Benvenuto!',
+    'whereEat': 'Dove mangi oggi?',
+    'eatIn': 'Mangio qui',
+    'takeAway': 'Porto via',
+    'chooseLanguage': 'Scegli la lingua',
+    'yourOrder': 'Il tuo ordine',
+    'viewOrder': 'Vedi ordine',
+    'emptyCart': 'Il tuo ordine è vuoto',
+    'emptyCartHint': 'Scegli qualcosa dal menu',
+    'cancelOrder': 'Annulla ordine',
+    'cancelOrderQuestion': 'Vuoi annullare l\'ordine e ricominciare?',
+    'yes': 'Sì',
+    'no': 'No',
+    'back': 'Indietro',
+    'add': 'Aggiungi',
+    'update': 'Aggiorna',
+    'remove': 'Rimuovi',
+    'edit': 'Modifica',
+    'total': 'Totale',
+    'items': 'articoli',
+    'soldOut': 'Esaurito',
+    'allergens': 'Allergeni',
+    'noAllergens': 'Nessun allergene dichiarato',
+    'allergenInfo': 'Info allergeni',
+    'allergenDisclaimer':
+        'Gli allergeni indicati sono quelli presenti negli ingredienti. '
+        'Per tracce e contaminazioni chiedi al personale.',
+    'required': 'Obbligatorio',
+    'chooseOne': 'Scegli 1',
+    'chooseUpTo': 'Scegli fino a {n}',
+    'chooseAtLeast': 'Scegli almeno {n}',
+    'chooseAny': 'Facoltativo',
+    'kcal': 'kcal',
+    'continueOrdering': 'Continua a ordinare',
+    'confirmOrder': 'Conferma ordine',
+    'confirmAndPay': 'Conferma e paga',
+    'howPay': 'Come vuoi pagare?',
+    'payHere': 'Paga qui con carta',
+    'payCounter': 'Paga in cassa',
+    'sending': 'Invio dell\'ordine…',
+    'paymentTitle': 'Pagamento',
+    'followTerminal': 'Segui le istruzioni sul terminale di pagamento',
+    'amountToPay': 'Importo da pagare',
+    'paymentFailed': 'Pagamento non riuscito',
+    'paymentFailedHint': 'Puoi riprovare o pagare in cassa.',
+    'retry': 'Riprova',
+    'thankYou': 'Grazie!',
+    'orderNumber': 'Il tuo numero d\'ordine',
+    'doneCounter': 'Ritira lo scontrino e paga in cassa.',
+    'donePaid': 'Pagamento riuscito. Ritira lo scontrino.',
+    'doneNoPayment': 'Il tuo ordine è stato inviato.',
+    'doneKitchen': 'Ti chiameremo quando sarà pronto.',
+    'newOrder': 'Nuovo ordine',
+    'stillThere': 'Sei ancora lì?',
+    'stillThereHint': 'L\'ordine verrà annullato tra {n} secondi.',
+    'continue': 'Continua',
+    'errorTitle': 'Si è verificato un problema',
+    'errorNetwork': 'Il servizio non è raggiungibile. Riprova tra poco.',
+    'errorGeneric': 'Non è stato possibile completare l\'operazione.',
+    'errorSoldOut': 'Un prodotto nel tuo ordine è appena terminato.',
+    'outOfService': 'Totem momentaneamente non disponibile',
+    'demo': 'DEMO',
+    'ok': 'OK',
+  },
+  'en': {
+    'languageName': 'English',
+    'touchToOrder': 'Touch to order',
+    'welcome': 'Welcome!',
+    'whereEat': 'Where will you eat today?',
+    'eatIn': 'Eat in',
+    'takeAway': 'Take away',
+    'chooseLanguage': 'Choose your language',
+    'yourOrder': 'Your order',
+    'viewOrder': 'View order',
+    'emptyCart': 'Your order is empty',
+    'emptyCartHint': 'Pick something from the menu',
+    'cancelOrder': 'Cancel order',
+    'cancelOrderQuestion': 'Cancel the order and start over?',
+    'yes': 'Yes',
+    'no': 'No',
+    'back': 'Back',
+    'add': 'Add',
+    'update': 'Update',
+    'remove': 'Remove',
+    'edit': 'Edit',
+    'total': 'Total',
+    'items': 'items',
+    'soldOut': 'Sold out',
+    'allergens': 'Allergens',
+    'noAllergens': 'No declared allergens',
+    'allergenInfo': 'Allergen info',
+    'allergenDisclaimer':
+        'Listed allergens are those contained in the ingredients. '
+        'Ask our staff about traces and cross-contamination.',
+    'required': 'Required',
+    'chooseOne': 'Choose 1',
+    'chooseUpTo': 'Choose up to {n}',
+    'chooseAtLeast': 'Choose at least {n}',
+    'chooseAny': 'Optional',
+    'kcal': 'kcal',
+    'continueOrdering': 'Keep ordering',
+    'confirmOrder': 'Confirm order',
+    'confirmAndPay': 'Confirm and pay',
+    'howPay': 'How would you like to pay?',
+    'payHere': 'Pay here by card',
+    'payCounter': 'Pay at the counter',
+    'sending': 'Sending your order…',
+    'paymentTitle': 'Payment',
+    'followTerminal': 'Follow the instructions on the payment terminal',
+    'amountToPay': 'Amount due',
+    'paymentFailed': 'Payment failed',
+    'paymentFailedHint': 'You can try again or pay at the counter.',
+    'retry': 'Try again',
+    'thankYou': 'Thank you!',
+    'orderNumber': 'Your order number',
+    'doneCounter': 'Take your ticket and pay at the counter.',
+    'donePaid': 'Payment successful. Take your ticket.',
+    'doneNoPayment': 'Your order has been sent.',
+    'doneKitchen': 'We will call your number when it is ready.',
+    'newOrder': 'New order',
+    'stillThere': 'Are you still there?',
+    'stillThereHint': 'Your order will be cancelled in {n} seconds.',
+    'continue': 'Continue',
+    'errorTitle': 'Something went wrong',
+    'errorNetwork': 'The service is unreachable. Please try again shortly.',
+    'errorGeneric': 'The operation could not be completed.',
+    'errorSoldOut': 'An item in your order has just sold out.',
+    'outOfService': 'Kiosk temporarily unavailable',
+    'demo': 'DEMO',
+    'ok': 'OK',
+  },
+};
+
+class Strings {
+  final String lang;
+  const Strings(this.lang);
+
+  static Set<String> get supported => _strings.keys.toSet();
+
+  String call(String key, {Map<String, Object>? args}) {
+    var s = _strings[lang]?[key] ?? _strings['it']![key] ?? key;
+    args?.forEach((k, v) => s = s.replaceAll('{$k}', '$v'));
+    return s;
+  }
+
+  String text(LocalizedText t) => t.resolve(lang);
+
+  String languageName(String code) =>
+      _strings[code]?['languageName'] ?? code.toUpperCase();
+}

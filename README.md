@@ -11,7 +11,8 @@ normale PC in **modalità demo**, senza POS né registratore telematico.
 | --- | --- |
 | `packages/kiosk_core` | Modelli condivisi (menu, allergeni, ordini, impostazioni, flusso ordine). Usati dal server e da tutte le app. |
 | `server` | Server locale Dart: database SQLite, API REST, WebSocket per gli aggiornamenti in tempo reale, adattatori per POS, stampanti e dispositivo fiscale. |
-| `apps/` | App Flutter (kiosk, cucina, gestione): in arrivo nei passi successivi. |
+| `apps/kiosk` | App Flutter del totem (Windows, e web per provarla da PC). |
+| `apps/` | Schermo cucina e pannello di gestione: in arrivo nel passo 3. |
 
 ## Avvio rapido
 
@@ -28,6 +29,48 @@ Al primo avvio il server crea `server/data/foodkiosk.db`, carica un menu demo
 segnaposto) e parte in **modalità demo**. PIN staff/admin predefinito: `1234`.
 
 Opzioni: `--port`, `--host`, `--data-dir`, `--no-demo-menu`.
+
+## App kiosk
+
+Serve [Flutter](https://docs.flutter.dev/get-started/install) (stable).
+
+Il flusso per il cliente: schermata di attesa → lingua e "mangio qui / porto
+via" → menu per categorie → dettaglio prodotto (foto, descrizione,
+calorie, allergeni, varianti obbligatorie ed extra, quantità) → carrello →
+pagamento sul totem, in cassa o a scelta del cliente, secondo il flusso
+configurato → numero d'ordine. Se il cliente si allontana, dopo il tempo di
+inattività il totem chiede "Sei ancora lì?" e poi ricomincia, annullando
+l'eventuale ordine non pagato.
+
+**Provarla da PC nel browser**, servita dallo stesso server:
+
+```sh
+cd apps/kiosk
+flutter build web --base-href /kiosk/ --no-web-resources-cdn
+cd ../../server
+dart run bin/server.dart --kiosk-web ../apps/kiosk/build/web
+# apri http://localhost:8080/kiosk/
+```
+
+**Sul totem Windows**:
+
+```sh
+cd apps/kiosk
+flutter run -d windows                    # sviluppo
+flutter build windows                     # build da installare
+```
+
+L'app cerca il server su `http://localhost:8080/`. Per un server su un altro
+PC: `--dart-define=SERVER_URL=http://192.168.1.10:8080/` in compilazione,
+oppure dal **menu staff**: tieni premuto 3 secondi l'angolo in alto a
+sinistra, inserisci il PIN staff e imposta l'indirizzo. Dallo stesso menu si
+ricarica il menu o si chiude l'app.
+
+Logo e colori sono segnaposto: i colori stanno in
+`apps/kiosk/lib/src/ui/theme.dart`, il logo è servito dal server. Le
+traduzioni dell'interfaccia sono in `apps/kiosk/lib/src/i18n.dart`: per
+aggiungere una lingua basta un nuovo blocco di testi e abilitarla nelle
+impostazioni.
 
 ## Modalità demo
 
@@ -142,15 +185,15 @@ WebSocket `/ws` (con `?pin=` per ricevere anche gli ordini): eventi
 ## Sviluppo
 
 ```sh
-dart format .
-dart analyze
+dart format packages server && dart analyze packages server
 (cd packages/kiosk_core && dart test)
 (cd server && dart test)
+(cd apps/kiosk && flutter analyze && flutter test)
 ```
 
 ## Piano di lavoro
 
-1. **Fondamenta e backend** ← questo passo
-2. App kiosk Windows (Flutter)
+1. **Fondamenta e backend** ✓
+2. **App kiosk Windows (Flutter)** ✓
 3. Schermo cucina e pannello di gestione
 4. Installazione nel locale: modalità kiosk Windows, installer, POS reale, registratore telematico

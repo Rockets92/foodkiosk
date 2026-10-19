@@ -1,0 +1,180 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:kiosk_app/src/state/cart.dart';
+import 'package:kiosk_app/src/state/kiosk_controller.dart';
+import 'package:kiosk_app/src/ui/kiosk_app.dart';
+import 'package:kiosk_core/kiosk_core.dart';
+
+import 'fake_backend.dart';
+
+Future<KioskController> pumpKiosk(
+  WidgetTester tester,
+  FakeBackend backend,
+) async {
+  tester.view.physicalSize = const Size(1080, 1920);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  final controller = KioskController(backend);
+  await controller.init();
+  await tester.pumpWidget(
+    KioskApp(controller: controller, onServerChanged: (_) async {}),
+  );
+  await tester.pump();
+  return controller;
+}
+
+Future<void> tapKey(WidgetTester tester, String key) async {
+  await tester.ensureVisible(find.byKey(ValueKey(key)));
+  await tester.tap(find.byKey(ValueKey(key)));
+  await tester.pumpAndSettle();
+}
+
+/// Attract -> eat in -> menu.
+Future<void> goToMenu(WidgetTester tester) async {
+  await tester.tap(find.text('Tocca per ordinare'));
+  await tester.pumpAndSettle();
+  await tapKey(tester, 'mode-eatIn');
+}
+
+void main() {
+  testWidgets('order and pay at the counter', (tester) async {
+    final backend = FakeBackend();
+    final k = await pumpKiosk(tester, backend);
+    expect(find.byType(Banner), findsOneWidget);
+
+    await goToMenu(tester);
+    await tapKey(tester, 'product-burger');
+    expect(find.text('Glutine'), findsOneWidget);
+    await tapKey(tester, 'option-bacon');
+    await tapKey(tester, 'qty-plus');
+    await tapKey(tester, 'add-to-cart');
+    expect(k.cart.single.optionIds, ['bacon']);
+    expect(find.text('15,00 €'), findsWidgets);
+
+    await tapKey(tester, 'view-order');
+    await tapKey(tester, 'submit-default');
+    expect(find.byKey(const ValueKey('order-number')), findsOneWidget);
+    expect(find.text('001'), findsOneWidget);
+    expect(find.textContaining('paga in cassa'), findsOneWidget);
+    expect(backend.requests.single.serviceMode, ServiceMode.eatIn);
+
+    // The attract screen animates forever: pump instead of settling.
+    await tester.tap(find.byKey(const ValueKey('new-order')));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(k.step, KioskStep.attract);
+    expect(k.cart, isEmpty);
+  });
+
+  testWidgets('required options block the add button until chosen', (
+    tester,
+  ) async {
+    await pumpKiosk(tester, FakeBackend());
+    await goToMenu(tester);
+    await tapKey(tester, 'product-meal');
+    final add = find.byKey(const ValueKey('add-to-cart'));
+    expect(tester.widget<FilledButton>(add).onPressed, isNull);
+    await tapKey(tester, 'option-salad');
+    expect(tester.widget<FilledButton>(add).onPressed, isNotNull);
+  });
+
+  testWidgets('sold out products cannot be opened', (tester) async {
+    final k = await pumpKiosk(tester, FakeBackend());
+    await goToMenu(tester);
+    await tapKey(tester, 'cat-drinks');
+    expect(find.text('ESAURITO'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('product-water')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('product-sheet')), findsNothing);
+    expect(k.cart, isEmpty);
+  });
+
+  testWidgets('declined card payment can move to the counter', (tester) async {
+    final backend = FakeBackend(
+      settings: const KioskSettings(flow: FlowConfig.fullService),
+    )..paymentResults.add(false);
+    await pumpKiosk(tester, backend);
+    await goToMenu(tester);
+    await tapKey(tester, 'cat-drinks');
+    await tapKey(tester, 'product-cola');
+    await tapKey(tester, 'add-to-cart');
+    await tapKey(tester, 'view-order');
+    expect(find.text('Conferma e paga'), findsOneWidget);
+    await tapKey(tester, 'submit-default');
+
+    expect(find.byKey(const ValueKey('payment-failed')), findsOneWidget);
+    await tapKey(tester, 'pay-counter-instead');
+    expect(find.text('001'), findsOneWidget);
+    expect(find.textContaining('paga in cassa'), findsOneWidget);
+  });
+
+  testWidgets('customer chooses how to pay', (tester) async {
+    final backend = FakeBackend(
+      settings: const KioskSettings(
+        flow: FlowConfig(
+          paymentMode: PaymentMode.customerChoice,
+          rules: {
+            FlowEvent.submitted: [FlowAction.printCustomerTicket],
+          },
+        ),
+      ),
+    );
+    await pumpKiosk(tester, backend);
+    await goToMenu(tester);
+    await tapKey(tester, 'cat-drinks');
+    await tapKey(tester, 'product-cola');
+    await tapKey(tester, 'add-to-cart');
+    await tapKey(tester, 'view-order');
+    await tapKey(tester, 'submit-kiosk');
+    expect(backend.requests.single.paymentChoice, PaymentMode.kiosk);
+    expect(find.textContaining('Pagamento riuscito'), findsOneWidget);
+  });
+
+  testWidgets('switching language translates menu and labels', (tester) async {
+    await pumpKiosk(tester, FakeBackend());
+    await tester.tap(find.text('Tocca per ordinare'));
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'start-lang-en');
+    expect(find.text('Take away'), findsOneWidget);
+    await tapKey(tester, 'mode-takeAway');
+    expect(find.text('Burgers'), findsWidgets);
+    expect(find.text('View order'), findsOneWidget);
+  });
+
+  testWidgets('an idle customer is asked, then the kiosk resets', (
+    tester,
+  ) async {
+    final k = await pumpKiosk(
+      tester,
+      FakeBackend(settings: const KioskSettings(idleTimeoutSeconds: 30)),
+    );
+    await goToMenu(tester);
+    k.addToCart(const CartLine(productId: 'cola'));
+    await tester.pump();
+
+    await tester.pump(const Duration(seconds: 31));
+    expect(find.byKey(const ValueKey('idle-dialog')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('idle-continue')));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('idle-dialog')), findsNothing);
+    expect(k.step, KioskStep.menu);
+
+    await tester.pump(const Duration(seconds: 31));
+    await tester.pump(const Duration(seconds: 16));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(k.step, KioskStep.attract);
+    expect(k.cart, isEmpty);
+  });
+
+  test('cart merges identical items and prices options', () async {
+    final k = KioskController(FakeBackend());
+    await k.init();
+    k.addToCart(const CartLine(productId: 'meal', optionIds: ['l', 'fries']));
+    k.addToCart(const CartLine(productId: 'meal', optionIds: ['fries', 'l']));
+    k.addToCart(const CartLine(productId: 'meal', optionIds: ['m', 'fries']));
+    expect(k.cart, hasLength(2));
+    expect(k.cart.first.quantity, 2);
+    expect(k.cartTotal, (990 + 80) * 2 + 990);
+    k.setQuantity(1, 0);
+    expect(k.cart, hasLength(1));
+  });
+}
