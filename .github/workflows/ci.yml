@@ -36,3 +36,47 @@ jobs:
       - run: flutter analyze --fatal-infos
       - run: flutter test
       - run: flutter build web --base-href /kiosk/ --no-web-resources-cdn
+
+  staff:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/staff
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: flutter analyze --fatal-infos
+      - run: flutter test
+      - run: flutter build web --base-href /staff/ --no-web-resources-cdn
+
+  # Windows package: portable folder and installer, downloadable from the
+  # run's "Artifacts".
+  windows:
+    needs: [server, kiosk, staff]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup -y --no-progress
+          }
+      - name: Build package and installer
+        shell: pwsh
+        run: ./packaging/windows/build.ps1 -Installer
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FoodKiosk-Windows-portatile
+          path: dist/FoodKiosk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FoodKiosk-Windows-installer
+          path: dist/FoodKiosk-Setup.exe

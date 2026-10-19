@@ -37,6 +37,7 @@ class KioskApp {
     AdapterRegistry? registry,
     bool seedDemo = true,
     Handler? mediaHandler,
+    String? mediaDir,
     DateTime Function()? clock,
   }) {
     final bus = EventBus();
@@ -64,6 +65,7 @@ class KioskApp {
       registry: reg,
       bus: bus,
       mediaHandler: mediaHandler,
+      mediaDir: mediaDir,
     );
     return KioskApp._(
       db,

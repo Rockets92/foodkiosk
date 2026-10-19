@@ -1,6 +1,6 @@
 {
-    "name": "kiosk_app",
-    "short_name": "kiosk_app",
+    "name": "Food Kiosk",
+    "short_name": "Food Kiosk",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

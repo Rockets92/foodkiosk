@@ -474,4 +474,164 @@ void main() {
     final bytes = EscPosEncoder(42).encode(const Ticket([TicketText('è 1€')]));
     expect(bytes, containsAllInOrder([0x8a, 0x20, 0x31, 0xd5]));
   });
+
+  group('staff screens', () {
+    test('pickup board follows the kitchen', () async {
+      final order = await placeOrder([burgerMeal()]);
+      final id = order['id'];
+      await call('POST', '/api/staff/orders/$id/mark-paid', staff: true);
+      var (_, board) = await call('GET', '/api/pickup');
+      expect(board, {
+        'preparing': [order['number']],
+        'ready': <int>[],
+      });
+      await call(
+        'POST',
+        '/api/kitchen/orders/$id/status',
+        body: {'status': 'ready'},
+        staff: true,
+      );
+      (_, board) = await call('GET', '/api/pickup');
+      expect(board['ready'], [order['number']]);
+    });
+
+    test('day summary counts paid revenue and top products', () async {
+      final a = await placeOrder([burgerMeal(qty: 2)]);
+      final b = await placeOrder([burgerMeal()]);
+      await call('POST', '/api/staff/orders/${a['id']}/mark-paid', staff: true);
+      await call('POST', '/api/staff/orders/${b['id']}/cancel', staff: true);
+      final (status, body) = await call(
+        'GET',
+        '/api/staff/summary',
+        staff: true,
+      );
+      expect(status, 200);
+      expect(body['orders'], 1);
+      expect(body['cancelled'], 1);
+      expect(body['revenueCents'], a['totalCents']);
+      expect(body['topProducts'][0]['quantity'], 2);
+    });
+
+    test('photos are uploaded to the media folder', () async {
+      final dir = Directory.systemTemp.createTempSync('media');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      await app.close();
+      app = KioskApp(AppDatabase.inMemory(), mediaDir: dir.path);
+      final res = await app.handler(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/api/admin/media?name=My Burger.PNG'),
+          body: [1, 2, 3],
+          headers: {'x-staff-pin': pin},
+        ),
+      );
+      expect(res.statusCode, 201);
+      final url = jsonDecode(await res.readAsString())['url'] as String;
+      expect(url, matches(RegExp(r'^/media/my-burger-[a-z0-9]+\.png$')));
+      expect(File('${dir.path}/${url.substring(7)}').readAsBytesSync(), [
+        1,
+        2,
+        3,
+      ]);
+      final bad = await app.handler(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/api/admin/media?name=virus.exe'),
+          body: [1],
+          headers: {'x-staff-pin': pin},
+        ),
+      );
+      expect(bad.statusCode, 400);
+    });
+  });
+
+  group('Epson RT fiscal printer', () {
+    late HttpServer device;
+    late List<String> received;
+    var reply = '';
+
+    setUp(() async {
+      received = [];
+      device = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      device.listen((req) async {
+        received.add('${req.uri}\n${await utf8.decodeStream(req)}');
+        req.response
+          ..headers.contentType = ContentType('text', 'xml')
+          ..write(reply)
+          ..close();
+      });
+    });
+    tearDown(() => device.close(force: true));
+
+    Order paidOrder() => Order(
+      id: 'o1',
+      number: 7,
+      createdAt: DateTime(2026, 10, 19),
+      serviceMode: ServiceMode.eatIn,
+      language: 'it',
+      paymentMode: PaymentMode.kiosk,
+      status: OrderStatus.open,
+      paymentStatus: PaymentStatus.paid,
+      kitchenStatus: KitchenStatus.none,
+      payment: PaymentInfo(provider: 'card', at: DateTime(2026, 10, 19)),
+      lines: const [
+        OrderLine(
+          productId: 'b',
+          name: LocalizedText({'it': 'Panino & patatine'}),
+          quantity: 2,
+          unitPriceCents: 650,
+          vatRate: 10,
+          options: [
+            OrderLineOption(
+              groupId: 'x',
+              optionId: 'bacon',
+              name: LocalizedText({'it': 'Bacon'}),
+              priceDeltaCents: 100,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    test('sends the sale and reads the receipt number', () async {
+      reply =
+          '<soapenv:Envelope><soapenv:Body><response success="true" '
+          'code="" status="2"><addInfo><fiscalReceiptNumber>12'
+          '</fiscalReceiptNumber><zRepNumber>41</zRepNumber></addInfo>'
+          '</response></soapenv:Body></soapenv:Envelope>';
+      final rt = EpsonFiscalPrinter.fromOptions({
+        'host': '127.0.0.1',
+        'port': device.port,
+        'departments': {'10': 3},
+      });
+      final doc = await rt.issue(paidOrder());
+      expect(doc.number, '0042-0012');
+      final sent = received.single;
+      expect(sent, contains('/cgi-bin/fpmate.cgi?devid=local_printer'));
+      expect(
+        sent,
+        contains(
+          'description="Panino &amp; patatine" quantity="2" '
+          'unitPrice="6,50" department="3"',
+        ),
+      );
+      expect(sent, contains('unitPrice="1,00"'));
+      expect(sent, contains('payment="15,00" paymentType="2"'));
+    });
+
+    test('a refused receipt is an error', () async {
+      reply = '<response success="false" code="EPTR_REC_EMPTY" status="0"/>';
+      final rt = EpsonFiscalPrinter(host: '127.0.0.1', port: device.port);
+      expect(
+        rt.issue(paidOrder()),
+        throwsA(
+          isA<FiscalException>().having(
+            (e) => e.message,
+            'message',
+            contains('EPTR_REC_EMPTY'),
+          ),
+        ),
+      );
+    });
+  });
 }

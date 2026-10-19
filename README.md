@@ -12,7 +12,11 @@ normale PC in **modalità demo**, senza POS né registratore telematico.
 | `packages/kiosk_core` | Modelli condivisi (menu, allergeni, ordini, impostazioni, flusso ordine). Usati dal server e da tutte le app. |
 | `server` | Server locale Dart: database SQLite, API REST, WebSocket per gli aggiornamenti in tempo reale, adattatori per POS, stampanti e dispositivo fiscale. |
 | `apps/kiosk` | App Flutter del totem (Windows, e web per provarla da PC). |
-| `apps/` | Schermo cucina e pannello di gestione: in arrivo nel passo 3. |
+| `apps/staff` | App Flutter per il personale: cassa, schermo cucina, schermo ritiro, gestione menu, impostazioni, riepilogo della giornata (Windows e web). |
+| `packaging/windows` | Script di build del pacchetto Windows, avvii rapidi `.bat` e installer (Inno Setup). |
+
+**Per provarlo sul proprio PC** senza installare niente di tecnico c'è la
+[guida rapida](docs/GUIDA-RAPIDA.md).
 
 ## Avvio rapido
 
@@ -24,11 +28,14 @@ cd server
 dart run bin/server.dart            # http://localhost:8080
 ```
 
-Al primo avvio il server crea `server/data/foodkiosk.db`, carica un menu demo
+Al primo avvio il server crea `server/data/foodkiosk.db` (su Windows
+`%ProgramData%\FoodKiosk\data`), carica un menu demo
 (panini, menu, contorni, bibite, dolci con allergeni, calorie e foto
 segnaposto) e parte in **modalità demo**. PIN staff/admin predefinito: `1234`.
 
-Opzioni: `--port`, `--host`, `--data-dir`, `--no-demo-menu`.
+Opzioni: `--port`, `--host`, `--data-dir`, `--no-demo-menu`, `--kiosk-web`,
+`--staff-web` (cartelle delle build web da servire su `/kiosk/` e `/staff/`;
+nel pacchetto Windows vengono trovate da sole).
 
 ## App kiosk
 
@@ -78,6 +85,66 @@ locale non carica le proprie foto. Il font è Poppins (licenza OFL, incluso). Le
 traduzioni dell'interfaccia sono in `apps/kiosk/lib/src/i18n.dart`: per
 aggiungere una lingua basta un nuovo blocco di testi e abilitarla nelle
 impostazioni.
+
+## App staff
+
+Un'unica app (nel browser su `http://<server>:8080/staff/` o come
+programma Windows) con accesso tramite PIN staff e una barra laterale:
+
+- **Riepilogo**: incasso, ordini, scontrino medio, ordini da incassare,
+  andamento per ora e prodotti più venduti, per qualsiasi giorno.
+- **Cassa**: ordini del giorno con filtri e ricerca per numero; dettaglio
+  con righe, IVA, storico; incasso in contanti o con carta (con o senza
+  documento fiscale), annullamento, ristampa e nuovo tentativo delle azioni
+  fallite (per esempio stampante spenta).
+- **Cucina**: scontrini in tre colonne (da preparare, in preparazione,
+  pronti) con tempi di attesa colorati, allergeni evidenziati, a schermo
+  intero per il monitor della cucina; interruttori rapidi "esaurito".
+- **Ritiro**: schermo per i clienti con i numeri in preparazione e pronti.
+  Si apre anche senza PIN dalla schermata di accesso ("Schermo ritiro"),
+  per un monitor dedicato.
+- **Menu**: prodotti (foto caricabili, prezzi, IVA, allergeni, etichette
+  "Novità", varianti, disponibilità), categorie e gruppi di varianti.
+- **Impostazioni**: modalità demo, lingue, "mangio qui / porto via",
+  flusso dell'ordine con verifica immediata delle combinazioni, dispositivi
+  (POS, registratore telematico, stampanti) e PIN.
+
+```sh
+cd apps/staff
+flutter build web --base-href /staff/ --no-web-resources-cdn
+cd ../../server
+dart run bin/server.dart --kiosk-web ../apps/kiosk/build/web --staff-web ../apps/staff/build/web
+# apri http://localhost:8080/staff/ (PIN 1234)
+```
+
+## Pacchetto Windows
+
+Ogni esecuzione della CI produce, tra gli *Artifacts* della run su GitHub
+Actions:
+
+- **FoodKiosk-Windows-portatile**: cartella pronta, si scompatta e si usa
+  (`Avvia demo.bat`, `Avvia totem.bat`, `Avvia staff.bat`, `Avvia
+  server.bat`, `LEGGIMI.txt`);
+- **FoodKiosk-Windows-installer**: `FoodKiosk-Setup.exe`, con scelta dei
+  componenti (tutto, solo totem, solo postazione staff), icone, avvio
+  automatico del server e, se richiesto, del totem all'accesso a Windows, e
+  regola del firewall per la rete locale.
+
+Per crearli in locale su Windows (Flutter con il carico di lavoro "Sviluppo
+di applicazioni desktop con C++" di Visual Studio, e Inno Setup 6 per
+l'installer):
+
+```powershell
+./packaging/windows/build.ps1 -Installer
+```
+
+Il totem Windows parte a **schermo intero senza bordi e sempre in primo
+piano** (`--windowed` per una finestra normale, `--hide-cursor` per
+nascondere il puntatore). Per un totem chiuso come nei fast food conviene
+usare un account Windows dedicato con l'avvio automatico del totem
+(opzione dell'installer) oppure la funzione di Windows "Accesso assegnato"
+(chiosco); per uscire dal totem: angolo in alto a sinistra per 3 secondi,
+PIN staff, "Chiudi applicazione".
 
 ## Modalità demo
 
@@ -140,7 +207,7 @@ nuovo significa scrivere una classe e registrarla, senza toccare il resto.
 | Tipo | Disponibili ora |
 | --- | --- |
 | Pagamento | `none`, `demo` |
-| Fiscale | `none`, `demo` |
+| Fiscale | `none`, `demo`, `epsonRt` (registratore telematico Epson FP-81 II RT, FP-90 III RT e compatibili, via rete) |
 | Stampante | `none`, `demo` (solo registro stampe), `escposNetwork` (stampante termica ESC/POS in rete, porta 9100) |
 
 Esempio di stampante termica di rete:
@@ -149,8 +216,26 @@ Esempio di stampante termica di rete:
 { "customerPrinter": { "type": "escposNetwork", "options": { "host": "192.168.1.50", "port": 9100, "width": 42 } } }
 ```
 
-L'integrazione con un POS reale, con le stampanti USB su Windows e con il
-registratore telematico è prevista nel passo 4.
+Esempio di registratore telematico Epson (reparti per aliquota IVA come
+configurati sulla stampante):
+
+```json
+{ "fiscal": { "type": "epsonRt", "options": { "host": "192.168.1.60", "departments": { "10": 1, "22": 2, "4": 3 } } } }
+```
+
+Il registratore riceve ogni vendita pagata (righe, varianti a pagamento,
+pagamento in contanti o elettronico) tramite il suo servizio web
+`fpmate.cgi`; il numero del documento commerciale finisce nell'ordine.
+L'adattatore è verificato contro un dispositivo simulato: prima dell'uso in
+produzione va provato sul modello reale del locale.
+
+**POS reale**: ogni circuito (Nexi, SumUp, Ingenico, Worldline, ...) ha il
+suo protocollo o SDK, quindi l'adattatore si scrive quando il locale ha
+scelto il fornitore. Basta implementare `PaymentTerminal` in
+`server/lib/src/adapters/payment.dart` e registrarlo; nel frattempo il totem
+funziona in modalità demo, oppure con pagamento in cassa (dove si usa il
+POS già presente). Le stampanti termiche USB su Windows si collegano come
+stampanti di rete condivise o tramite il loro driver di rete ESC/POS.
 
 ## API
 
@@ -161,6 +246,7 @@ Pubbliche (usate dal totem):
 | GET | `/api/settings` | Impostazioni pubbliche (lingue, modalità, flusso) |
 | GET | `/api/menu` | Menu visibile sul totem |
 | GET | `/api/allergens` | Elenco allergeni e etichette dietetiche tradotte |
+| GET | `/api/pickup` | Numeri in preparazione e pronti (schermo ritiro) |
 | POST | `/api/orders` | Crea un ordine (i prezzi li calcola sempre il server) |
 | GET | `/api/orders/<id>` | Stato dell'ordine |
 | POST | `/api/orders/<id>/pay` | Pagamento sul totem |
@@ -179,6 +265,8 @@ Staff e gestione (header `X-Staff-Pin`):
 | POST | `/api/staff/orders/<id>/cancel` | Annulla |
 | POST | `/api/staff/orders/<id>/actions/<azione>` | Ristampa / riprova un'azione |
 | GET | `/api/staff/print-jobs` | Registro stampe (anche quelle demo) |
+| GET | `/api/staff/summary` | Riepilogo del giorno (`day=AAAA-MM-GG`) |
+| POST | `/api/admin/media?name=foto.jpg` | Carica una foto (corpo: il file), restituisce l'URL |
 | GET/PUT | `/api/admin/settings` | Impostazioni complete |
 | GET | `/api/admin/flow/presets`, `/api/admin/adapters` | Preset e adattatori disponibili |
 | POST | `/api/admin/flow/validate` | Verifica un flusso |
@@ -196,11 +284,12 @@ dart format packages server && dart analyze packages server
 (cd packages/kiosk_core && dart test)
 (cd server && dart test)
 (cd apps/kiosk && flutter analyze && flutter test)
+(cd apps/staff && flutter analyze && flutter test)
 ```
 
 ## Piano di lavoro
 
 1. **Fondamenta e backend** ✓
 2. **App kiosk Windows (Flutter)** ✓
-3. Schermo cucina e pannello di gestione
-4. Installazione nel locale: modalità kiosk Windows, installer, POS reale, registratore telematico
+3. **Schermo cucina, schermo ritiro e pannello di gestione** ✓
+4. **Installazione nel locale**: totem a schermo intero, pacchetto e installer Windows, registratore telematico Epson ✓; adattatore del POS reale da scrivere quando il locale sceglie il fornitore

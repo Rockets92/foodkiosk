@@ -34,6 +34,7 @@ class KioskApp extends StatelessWidget {
         title: 'Food Kiosk',
         debugShowCheckedModeBanner: false,
         theme: _theme,
+        builder: (context, child) => _FitToScreen(child: child!),
         home: _Shell(onServerChanged: onServerChanged),
       ),
     );
@@ -78,6 +79,57 @@ class _Shell extends StatelessWidget {
           const DemoBadge(),
           StaffCorner(onServerChanged: onServerChanged),
         ],
+      ),
+    );
+  }
+}
+
+/// The kiosk is designed for a 1080 px wide portrait screen and needs at
+/// least 900 px of height. On smaller screens (smaller totems, a window on
+/// a PC) it is laid out at that size and scaled down, so it looks the same
+/// instead of overflowing.
+class _FitToScreen extends StatelessWidget {
+  static const minWidth = 1080.0;
+  static const minHeight = 900.0;
+  final Widget child;
+  const _FitToScreen({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final s = mq.size;
+    if (s.isEmpty) return child;
+    final scale = [
+      1.0,
+      s.width / minWidth,
+      s.height / minHeight,
+    ].reduce((a, b) => a < b ? a : b);
+    if (scale >= 1) return child;
+    final size = mq.size / scale;
+    return ClipRect(
+      child: OverflowBox(
+        alignment: Alignment.topLeft,
+        minWidth: 0,
+        minHeight: 0,
+        maxWidth: double.infinity,
+        maxHeight: double.infinity,
+        child: Transform.scale(
+          scale: scale,
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: size.width,
+            height: size.height,
+            child: MediaQuery(
+              data: mq.copyWith(
+                size: size,
+                padding: mq.padding / scale,
+                viewPadding: mq.viewPadding / scale,
+                viewInsets: mq.viewInsets / scale,
+              ),
+              child: child,
+            ),
+          ),
+        ),
       ),
     );
   }

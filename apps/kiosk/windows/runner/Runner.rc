@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "it.foodkiosk" "\0"
-            VALUE "FileDescription", "kiosk_app" "\0"
+            VALUE "CompanyName", "Food Kiosk" "\0"
+            VALUE "FileDescription", "Food Kiosk - totem self-service" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "kiosk_app" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 it.foodkiosk. All rights reserved." "\0"
-            VALUE "OriginalFilename", "kiosk_app.exe" "\0"
-            VALUE "ProductName", "kiosk_app" "\0"
+            VALUE "InternalName", "FoodKioskTotem" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Food Kiosk" "\0"
+            VALUE "OriginalFilename", "FoodKioskTotem.exe" "\0"
+            VALUE "ProductName", "Food Kiosk" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

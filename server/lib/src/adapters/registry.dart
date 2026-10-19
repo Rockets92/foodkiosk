@@ -1,5 +1,6 @@
 import 'package:kiosk_core/kiosk_core.dart';
 
+import 'epson_fiscal.dart';
 import 'fiscal.dart';
 import 'payment.dart';
 import 'printer.dart';
@@ -18,6 +19,7 @@ class AdapterRegistry {
   final Map<String, AdapterFactory<FiscalDevice>> fiscal = {
     'none': (_) => NoFiscalDevice(),
     'demo': (_) => DemoFiscalDevice(),
+    'epsonRt': EpsonFiscalPrinter.fromOptions,
   };
 
   final Map<String, AdapterFactory<TicketPrinter>> printer = {

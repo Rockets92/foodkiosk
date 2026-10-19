@@ -402,6 +402,65 @@ class OrderService {
     return _complete(order);
   }
 
+  /// Order numbers for the pickup screen: in preparation and ready.
+  Map<String, List<int>> pickupBoard() {
+    final today = OrderRepository.businessDay(_clock());
+    final open = _orders.query(businessDay: today, status: OrderStatus.open);
+    List<int> numbers(Set<KitchenStatus> statuses) => [
+      for (final o in open.reversed)
+        if (statuses.contains(o.kitchenStatus)) o.number,
+    ];
+    return {
+      'preparing': numbers({KitchenStatus.queued, KitchenStatus.preparing}),
+      'ready': numbers({KitchenStatus.ready}),
+    };
+  }
+
+  /// Day totals for the admin panel. Cancelled orders only count in
+  /// `cancelled`; revenue counts paid orders.
+  Map<String, Object?> summary(String businessDay) {
+    final all = _orders.query(businessDay: businessDay, limit: 100000);
+    final valid = all.where((o) => o.status != OrderStatus.cancelled);
+    final paid = valid.where((o) => o.paymentStatus == PaymentStatus.paid);
+    final revenue = paid.fold(0, (s, o) => s + o.totalCents);
+    final products = <String, ({String name, int qty, int cents})>{};
+    final byHour = List.filled(24, 0);
+    for (final o in valid) {
+      byHour[o.createdAt.toLocal().hour]++;
+      for (final l in o.lines) {
+        final prev = products[l.productId];
+        products[l.productId] = (
+          name: l.name.resolve('it'),
+          qty: (prev?.qty ?? 0) + l.quantity,
+          cents: (prev?.cents ?? 0) + l.totalCents,
+        );
+      }
+    }
+    final top = products.values.toList()
+      ..sort((a, b) => b.qty.compareTo(a.qty));
+    return {
+      'day': businessDay,
+      'orders': valid.length,
+      'cancelled': all.length - valid.length,
+      'demoOrders': valid.where((o) => o.isDemo).length,
+      'paidOrders': paid.length,
+      'revenueCents': revenue,
+      'averageCents': paid.isEmpty ? 0 : (revenue / paid.length).round(),
+      'awaitingCounter': valid
+          .where((o) => o.paymentStatus == PaymentStatus.awaitingCounter)
+          .length,
+      'eatIn': valid.where((o) => o.serviceMode == ServiceMode.eatIn).length,
+      'takeAway': valid
+          .where((o) => o.serviceMode == ServiceMode.takeAway)
+          .length,
+      'byHour': byHour,
+      'topProducts': [
+        for (final p in top.take(10))
+          {'name': p.name, 'quantity': p.qty, 'totalCents': p.cents},
+      ],
+    };
+  }
+
   // ---------------------------------------------------------------------
   // Cancellation and manual actions
 

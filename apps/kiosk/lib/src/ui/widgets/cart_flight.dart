@@ -29,11 +29,20 @@ abstract final class CartFlight {
       landed.value++;
       return;
     }
+    // Global (screen) rects to the overlay's own coordinates, which differ
+    // when the kiosk is scaled to fit a smaller window.
+    final box = overlay.context.findRenderObject() as RenderBox?;
+    Rect local(Rect r) => box == null
+        ? r
+        : Rect.fromPoints(
+            box.globalToLocal(r.topLeft),
+            box.globalToLocal(r.bottomRight),
+          );
     late OverlayEntry entry;
     entry = OverlayEntry(
       builder: (_) => _Flight(
-        from: from,
-        to: to,
+        from: local(from),
+        to: local(to),
         image: image,
         onDone: () {
           entry.remove();

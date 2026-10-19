@@ -14,13 +14,23 @@ Future<void> main(List<String> args) async {
     ..addOption(
       'data-dir',
       defaultsTo: 'data',
-      help: 'Folder for the database and uploaded media.',
+      help:
+          'Folder for the database and uploaded media. On Windows the '
+          'default is %ProgramData%\\FoodKiosk\\data.',
     )
     ..addOption(
       'kiosk-web',
       help:
           'Folder with the kiosk web build, served at /kiosk/ '
-          '(flutter build web --base-href /kiosk/).',
+          '(flutter build web --base-href /kiosk/). Default: web/kiosk '
+          'next to the executable, when present.',
+    )
+    ..addOption(
+      'staff-web',
+      help:
+          'Folder with the staff app web build (cashier, kitchen, pickup '
+          'screen, admin), served at /staff/. Default: web/staff next to '
+          'the executable, when present.',
     )
     ..addFlag(
       'no-demo-menu',
@@ -34,27 +44,47 @@ Future<void> main(List<String> args) async {
     return;
   }
 
-  final dataDir = Directory(opts['data-dir'] as String)
-    ..createSync(recursive: true);
+  final programData = Platform.environment['ProgramData'];
+  final dataPath = !opts.wasParsed('data-dir') && programData != null
+      ? p.join(programData, 'FoodKiosk', 'data')
+      : opts['data-dir'] as String;
+  final dataDir = Directory(dataPath)..createSync(recursive: true);
   final mediaDir = Directory(p.join(dataDir.path, 'media'))..createSync();
   final app = KioskApp(
     AppDatabase.open(p.join(dataDir.path, 'foodkiosk.db')),
     seedDemo: !(opts['no-demo-menu'] as bool),
     mediaHandler: createStaticHandler(mediaDir.path),
+    mediaDir: mediaDir.path,
   );
 
-  final kioskWeb = opts['kiosk-web'] as String?;
-  final kioskHandler = kioskWeb == null
-      ? null
-      : createStaticHandler(kioskWeb, defaultDocument: 'index.html');
+  // Web apps: an explicit folder, or the one shipped with the exe (the
+  // Windows package has server/bin/server.exe and web/ at the top).
+  final exeDir = p.dirname(Platform.resolvedExecutable);
+  String? webDir(String option, String name) {
+    final explicit = opts[option] as String?;
+    if (explicit != null) return explicit;
+    for (final up in ['.', '..', '../..']) {
+      final bundled = p.normalize(p.join(exeDir, up, 'web', name));
+      if (File(p.join(bundled, 'index.html')).existsSync()) return bundled;
+    }
+    return null;
+  }
+
+  final webApps = <String, Handler>{
+    for (final name in ['kiosk', 'staff'])
+      if (webDir('$name-web', name) case final dir?)
+        name: createStaticHandler(dir, defaultDocument: 'index.html'),
+  };
   final handler = const Pipeline().addMiddleware(logRequests()).addHandler((
     Request req,
   ) {
-    if (kioskHandler != null && req.url.path == 'kiosk') {
+    final path = req.url.path;
+    if (path.isEmpty && webApps.containsKey('kiosk')) {
       return Response.found('/kiosk/');
     }
-    if (kioskHandler != null && req.url.path.startsWith('kiosk/')) {
-      return kioskHandler(req.change(path: 'kiosk'));
+    for (final MapEntry(key: name, value: web) in webApps.entries) {
+      if (path == name) return Response.found('/$name/');
+      if (path.startsWith('$name/')) return web(req.change(path: name));
     }
     return app.handler(req);
   });
@@ -68,8 +98,8 @@ Future<void> main(List<String> args) async {
     'Food Kiosk server on http://${server.address.host}:${server.port}',
   );
   stdout.writeln('  data:  ${p.absolute(dataDir.path)}');
-  if (kioskWeb != null) {
-    stdout.writeln('  kiosk: http://localhost:${server.port}/kiosk/');
+  for (final name in webApps.keys) {
+    stdout.writeln('  $name: http://localhost:${server.port}/$name/');
   }
   stdout.writeln(
     '  mode:  ${s.demoMode ? 'DEMO (payments simulated)' : 'production'}',

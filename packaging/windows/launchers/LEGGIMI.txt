@@ -1,0 +1,27 @@
+FOOD KIOSK - totem self-service per il locale
+
+PROVA RAPIDA
+  Doppio clic su "Avvia demo.bat": parte il server e si aprono nel browser
+  il totem (http://localhost:8080/kiosk/) e l'area staff
+  (http://localhost:8080/staff/, PIN iniziale 1234).
+  Il programma parte in modalita' DEMO: pagamenti e scontrini simulati.
+
+ALTRI AVVII
+  Avvia totem.bat              totem a schermo intero (come sul chiosco)
+  Avvia totem in finestra.bat  totem in una finestra, per provarlo dal PC
+  Avvia staff.bat              app staff: cassa, cucina, ritiro, menu,
+                               impostazioni
+  Avvia server.bat             solo il server, con il registro attivita'
+
+  Per uscire dal totem a schermo intero: tieni premuto 3 secondi l'angolo
+  in alto a sinistra, inserisci il PIN staff e scegli "Chiudi applicazione".
+
+DATI
+  Menu, ordini e foto sono in %ProgramData%\FoodKiosk\data.
+  Cancella quella cartella (a server spento) per ripartire dal menu demo.
+
+ALTRI DISPOSITIVI IN RETE
+  Tablet o PC della cucina, monitor del ritiro e totem possono collegarsi
+  allo stesso server: apri http://<IP di questo PC>:8080/staff/ oppure
+  imposta l'indirizzo dal menu staff del totem. Se Windows chiede di
+  consentire l'accesso alla rete per FoodKioskServer, scegli "Consenti".

@@ -1,7 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:kiosk_core/kiosk_core.dart';
+import 'package:path/path.dart' as p;
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf_web_socket/shelf_web_socket.dart';
@@ -46,6 +50,9 @@ const _publicEvents = {
 class Api {
   final SettingsService settings;
   final MenuService menu;
+
+  /// Folder where uploaded photos are stored and served from `/media/`.
+  final String? mediaDir;
   final OrderService orders;
   final PrintJobRepository printJobs;
   final AdapterRegistry registry;
@@ -60,6 +67,7 @@ class Api {
     required this.registry,
     required this.bus,
     this.mediaHandler,
+    this.mediaDir,
   });
 
   bool _isStaff(Request req) {
@@ -88,6 +96,7 @@ class Api {
       ..get('/health', (Request _) => _ok({'status': 'ok'}))
       ..get('/settings', (Request _) => _ok(settings.current.toPublicJson()))
       ..get('/menu', (Request _) => _ok(menu.kioskMenu().toJson()))
+      ..get('/pickup', (Request _) => _ok(orders.pickupBoard()))
       ..get(
         '/allergens',
         (Request _) => _ok({
@@ -175,6 +184,15 @@ class Api {
         );
       })
       ..get('/staff/orders', _listOrders)
+      ..get(
+        '/staff/summary',
+        (Request req) => _ok(
+          orders.summary(
+            req.url.queryParameters['day'] ??
+                OrderRepository.businessDay(DateTime.now()),
+          ),
+        ),
+      )
       ..post('/staff/orders/<id>/mark-paid', (Request req, String id) async {
         final body = await _body(req);
         return _ok(
@@ -239,6 +257,7 @@ class Api {
         });
       })
       ..get('/admin/adapters', (Request _) => _ok(registry.describe()))
+      ..post('/admin/media', _upload)
       ..get('/admin/menu', (Request _) => _ok(menu.fullMenu().toJson()))
       ..post(
         '/admin/categories',
@@ -295,6 +314,45 @@ class Api {
         menu.deleteModifierGroup(id);
         return Response(204);
       });
+  }
+
+  static const _imageTypes = {'jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'};
+  static const _maxUpload = 10 * 1024 * 1024;
+
+  /// Stores a photo sent as the raw request body; `?name=burger.jpg` gives
+  /// the original file name. Returns the URL to use as `imageUrl`.
+  Future<Response> _upload(Request req) async {
+    final dir = mediaDir;
+    if (dir == null) {
+      throw ApiException.conflict('noMedia', 'Uploads are not enabled.');
+    }
+    final name = req.url.queryParameters['name'] ?? 'image.jpg';
+    final ext = p.extension(name).replaceFirst('.', '').toLowerCase();
+    if (!_imageTypes.contains(ext)) {
+      throw ApiException.badRequest(
+        'unsupportedType',
+        'Use a JPG, PNG, WEBP, GIF or SVG image.',
+      );
+    }
+    final bytes = BytesBuilder(copy: false);
+    await for (final chunk in req.read()) {
+      bytes.add(chunk);
+      if (bytes.length > _maxUpload) {
+        throw ApiException.badRequest('tooLarge', 'Images up to 10 MB.');
+      }
+    }
+    if (bytes.isEmpty) {
+      throw ApiException.badRequest('emptyFile', 'The file is empty.');
+    }
+    final base = p
+        .basenameWithoutExtension(name)
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+    final suffix = Random().nextInt(1 << 32).toRadixString(36);
+    final file = '${base.isEmpty ? 'image' : base}-$suffix.$ext';
+    await File(p.join(dir, file)).writeAsBytes(bytes.takeBytes());
+    return _ok({'url': '/media/$file'}, status: 201);
   }
 
   Response _listOrders(Request req) {

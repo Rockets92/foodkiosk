@@ -84,6 +84,15 @@ class FlowIssue {
 
   const FlowIssue(this.level, this.code, this.message);
 
+  factory FlowIssue.fromJson(Map<String, Object?> json) => FlowIssue(
+    FlowIssueLevel.values.firstWhere(
+      (l) => l.name == json['level'],
+      orElse: () => FlowIssueLevel.info,
+    ),
+    json['code'] as String? ?? '',
+    json['message'] as String? ?? '',
+  );
+
   Map<String, Object?> toJson() => {
     'level': level.name,
     'code': code,

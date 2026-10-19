@@ -1,6 +1,7 @@
 /// Local backend of the Food Kiosk suite.
 library;
 
+export 'src/adapters/epson_fiscal.dart';
 export 'src/adapters/fiscal.dart';
 export 'src/adapters/payment.dart';
 export 'src/adapters/printer.dart';
