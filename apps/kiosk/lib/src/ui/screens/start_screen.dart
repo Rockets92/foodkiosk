@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:kiosk_core/kiosk_core.dart';
 
 import '../scope.dart';
+import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/net_image.dart';
+import '../widgets/pressable.dart';
 
-/// Language and "eat in / take away" on a single screen, to save a tap.
+/// "Eat in or take away?" with the language switcher, on one screen.
 class StartScreen extends StatelessWidget {
   const StartScreen({super.key});
 
@@ -16,101 +20,74 @@ class StartScreen extends StatelessWidget {
       for (final m in ServiceMode.values)
         if (k.settings.serviceModes.contains(m)) m,
     ];
+    final landscape = MediaQuery.sizeOf(context).aspectRatio > 1;
     return Scaffold(
       key: const ValueKey('start'),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsets.fromLTRB(40, 24, 40, 40),
           child: Column(
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: k.reset,
-                  icon: const Icon(Icons.arrow_back),
-                  label: Text(t('back'), style: const TextStyle(fontSize: 20)),
-                ),
-              ),
-              const Spacer(),
-              const VenueLogo(size: 140),
-              const SizedBox(height: 24),
-              Text(
-                t('welcome'),
-                style: Theme.of(
-                  context,
-                ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 40),
-              if (k.settings.languages.length > 1) ...[
-                Text(
-                  t('chooseLanguage'),
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 16,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    for (final code in k.settings.languages)
-                      _LanguageButton(code: code),
-                  ],
-                ),
-                const SizedBox(height: 56),
-              ],
-              Text(
-                t('whereEat'),
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 32),
               Row(
                 children: [
-                  for (final m in modes)
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: _ModeCard(mode: m),
-                      ),
-                    ),
+                  RoundButton(
+                    key: const ValueKey('start-back'),
+                    icon: Icons.close_rounded,
+                    onTap: k.reset,
+                  ),
+                  const Spacer(),
+                  const LanguageSwitcher(),
                 ],
+              ),
+              const Spacer(),
+              const VenueLogo(
+                size: 120,
+              ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
+              const SizedBox(height: 28),
+              Text(
+                t('welcome'),
+                style: KText.display,
+                textAlign: TextAlign.center,
+              ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.3),
+              const SizedBox(height: 8),
+              Text(
+                    t('whereEat'),
+                    style: KText.h2.copyWith(
+                      color: K.inkSoft,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
+                  )
+                  .animate()
+                  .fadeIn(delay: 120.ms, duration: 400.ms)
+                  .slideY(begin: 0.3),
+              const SizedBox(height: 56),
+              SizedBox(
+                height: landscape ? 420 : 620,
+                child: Row(
+                  children: [
+                    for (final (i, m) in modes.indexed)
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          child: _ModeCard(mode: m)
+                              .animate()
+                              .fadeIn(
+                                delay: (220 + i * 120).ms,
+                                duration: 500.ms,
+                              )
+                              .slideY(
+                                begin: 0.25,
+                                curve: Curves.easeOutCubic,
+                                duration: 500.ms,
+                              ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
               const Spacer(flex: 2),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LanguageButton extends StatelessWidget {
-  final String code;
-  const _LanguageButton({required this.code});
-
-  @override
-  Widget build(BuildContext context) {
-    final k = context.kiosk;
-    final selected = k.language == code;
-    final scheme = Theme.of(context).colorScheme;
-    return InkWell(
-      key: ValueKey('start-lang-$code'),
-      borderRadius: BorderRadius.circular(16),
-      onTap: () => k.setLanguage(code),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-        decoration: BoxDecoration(
-          color: selected ? scheme.primary : scheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Text(
-          context.t.languageName(code),
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            color: selected ? scheme.onPrimary : scheme.onSurface,
           ),
         ),
       ),
@@ -125,32 +102,47 @@ class _ModeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    return Card(
+    final eatIn = mode == ServiceMode.eatIn;
+    return Pressable(
       key: ValueKey('mode-${mode.name}'),
-      child: InkWell(
-        onTap: () => context.kiosk.chooseServiceMode(mode),
-        child: AspectRatio(
-          aspectRatio: 0.9,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                mode == ServiceMode.eatIn
-                    ? Icons.restaurant
-                    : Icons.shopping_bag_outlined,
-                size: 120,
-                color: Theme.of(context).colorScheme.primary,
+      onTap: () => context.kiosk.chooseServiceMode(mode),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(40),
+          boxShadow: K.shadow,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                color: eatIn
+                    ? const Color(0xFFFFE9D6)
+                    : const Color(0xFFFFF1C7),
+                padding: const EdgeInsets.all(28),
+                child: Illustration(eatIn ? 'eat_in' : 'take_away'),
               ),
-              const SizedBox(height: 24),
-              Text(
-                t(mode.name),
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    eatIn
+                        ? Icons.restaurant_rounded
+                        : Icons.shopping_bag_rounded,
+                    color: K.red,
+                    size: 36,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(t(mode.name), style: KText.h2),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

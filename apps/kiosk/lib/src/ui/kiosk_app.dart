@@ -62,11 +62,20 @@ class _Shell extends StatelessWidget {
         children: [
           Positioned.fill(
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
+              duration: const Duration(milliseconds: 450),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: ScaleTransition(
+                  scale: Tween(begin: 0.97, end: 1.0).animate(anim),
+                  child: child,
+                ),
+              ),
               child: screen,
             ),
           ),
-          const DemoRibbon(),
+          const DemoBadge(),
           StaffCorner(onServerChanged: onServerChanged),
         ],
       ),

@@ -81,9 +81,13 @@ class ModifierOption {
   final bool enabled;
   final bool selectedByDefault;
 
+  /// Optional picture, shown on the kiosk as an illustrated choice.
+  final String? imageUrl;
+
   const ModifierOption({
     required this.id,
     required this.name,
+    this.imageUrl,
     this.priceDeltaCents = 0,
     this.allergens = const [],
     this.enabled = true,
@@ -93,6 +97,7 @@ class ModifierOption {
   factory ModifierOption.fromJson(Map<String, Object?> json) => ModifierOption(
     id: json['id'] as String,
     name: LocalizedText.fromJson(json['name']),
+    imageUrl: json['imageUrl'] as String?,
     priceDeltaCents: json['priceDeltaCents'] as int? ?? 0,
     allergens: _parseEnumList(json['allergens'], Allergen.tryParse),
     enabled: json['enabled'] as bool? ?? true,
@@ -102,6 +107,7 @@ class ModifierOption {
   Map<String, Object?> toJson() => {
     'id': id,
     'name': name.toJson(),
+    'imageUrl': imageUrl,
     'priceDeltaCents': priceDeltaCents,
     'allergens': [for (final a in allergens) a.name],
     'enabled': enabled,
@@ -171,6 +177,9 @@ class Product {
   final int? kcal;
   final int sortOrder;
 
+  /// Short promotional label shown on the product card ("Novità", "Top").
+  final LocalizedText badge;
+
   /// Shown on the kiosk at all.
   final bool enabled;
 
@@ -195,6 +204,7 @@ class Product {
     this.tags = const [],
     this.kcal,
     this.sortOrder = 0,
+    this.badge = const LocalizedText.empty(),
     this.enabled = true,
     this.soldOut = false,
     this.trackStock = false,
@@ -208,6 +218,7 @@ class Product {
     name: LocalizedText.fromJson(json['name']),
     description: LocalizedText.fromJson(json['description']),
     imageUrl: json['imageUrl'] as String?,
+    badge: LocalizedText.fromJson(json['badge']),
     priceCents: json['priceCents'] as int,
     vatRate: (json['vatRate'] as num? ?? 10).toDouble(),
     allergens: _parseEnumList(json['allergens'], Allergen.tryParse),
@@ -230,6 +241,7 @@ class Product {
     'name': name.toJson(),
     'description': description.toJson(),
     'imageUrl': imageUrl,
+    'badge': badge.toJson(),
     'priceCents': priceCents,
     'vatRate': vatRate,
     'allergens': [for (final a in allergens) a.name],

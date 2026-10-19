@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kiosk_app/src/state/cart.dart';
 import 'package:kiosk_app/src/state/kiosk_controller.dart';
 import 'package:kiosk_app/src/ui/kiosk_app.dart';
+import 'package:kiosk_app/src/ui/widgets/pressable.dart';
 import 'package:kiosk_core/kiosk_core.dart';
 
 import 'fake_backend.dart';
@@ -23,16 +24,24 @@ Future<KioskController> pumpKiosk(
   return controller;
 }
 
+/// Lets transitions finish. The kiosk has animations that repeat forever
+/// (attract screen, demo badge), so `pumpAndSettle` would never return.
+Future<void> settle(WidgetTester tester) async {
+  for (var i = 0; i < 12; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+}
+
 Future<void> tapKey(WidgetTester tester, String key) async {
   await tester.ensureVisible(find.byKey(ValueKey(key)));
+  await tester.pump();
   await tester.tap(find.byKey(ValueKey(key)));
-  await tester.pumpAndSettle();
+  await settle(tester);
 }
 
 /// Attract -> eat in -> menu.
 Future<void> goToMenu(WidgetTester tester) async {
-  await tester.tap(find.text('Tocca per ordinare'));
-  await tester.pumpAndSettle();
+  await tapKey(tester, 'attract');
   await tapKey(tester, 'mode-eatIn');
 }
 
@@ -40,7 +49,7 @@ void main() {
   testWidgets('order and pay at the counter', (tester) async {
     final backend = FakeBackend();
     final k = await pumpKiosk(tester, backend);
-    expect(find.byType(Banner), findsOneWidget);
+    expect(find.byKey(const ValueKey('demo-badge')), findsOneWidget);
 
     await goToMenu(tester);
     await tapKey(tester, 'product-burger');
@@ -59,8 +68,7 @@ void main() {
     expect(backend.requests.single.serviceMode, ServiceMode.eatIn);
 
     // The attract screen animates forever: pump instead of settling.
-    await tester.tap(find.byKey(const ValueKey('new-order')));
-    await tester.pump(const Duration(milliseconds: 500));
+    await tapKey(tester, 'new-order');
     expect(k.step, KioskStep.attract);
     expect(k.cart, isEmpty);
   });
@@ -72,9 +80,24 @@ void main() {
     await goToMenu(tester);
     await tapKey(tester, 'product-meal');
     final add = find.byKey(const ValueKey('add-to-cart'));
-    expect(tester.widget<FilledButton>(add).onPressed, isNull);
+    expect(tester.widget<KButton>(add).onTap, isNull);
     await tapKey(tester, 'option-salad');
-    expect(tester.widget<FilledButton>(add).onPressed, isNotNull);
+    expect(tester.widget<KButton>(add).onTap, isNotNull);
+  });
+
+  testWidgets('quick add skips the sheet unless a choice is required', (
+    tester,
+  ) async {
+    final k = await pumpKiosk(tester, FakeBackend());
+    await goToMenu(tester);
+    await tapKey(tester, 'quick-add-burger');
+    expect(find.byKey(const ValueKey('product-sheet')), findsNothing);
+    expect(k.cart.single.productId, 'burger');
+    expect(find.text('6,50 €'), findsWidgets);
+
+    await tapKey(tester, 'quick-add-meal');
+    expect(find.byKey(const ValueKey('product-sheet')), findsOneWidget);
+    expect(k.cart, hasLength(1));
   });
 
   testWidgets('sold out products cannot be opened', (tester) async {
@@ -82,8 +105,7 @@ void main() {
     await goToMenu(tester);
     await tapKey(tester, 'cat-drinks');
     expect(find.text('ESAURITO'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('product-water')));
-    await tester.pumpAndSettle();
+    await tapKey(tester, 'product-water');
     expect(find.byKey(const ValueKey('product-sheet')), findsNothing);
     expect(k.cart, isEmpty);
   });
@@ -124,6 +146,7 @@ void main() {
     await tapKey(tester, 'product-cola');
     await tapKey(tester, 'add-to-cart');
     await tapKey(tester, 'view-order');
+    await tapKey(tester, 'submit-default');
     await tapKey(tester, 'submit-kiosk');
     expect(backend.requests.single.paymentChoice, PaymentMode.kiosk);
     expect(find.textContaining('Pagamento riuscito'), findsOneWidget);
@@ -131,13 +154,12 @@ void main() {
 
   testWidgets('switching language translates menu and labels', (tester) async {
     await pumpKiosk(tester, FakeBackend());
-    await tester.tap(find.text('Tocca per ordinare'));
-    await tester.pumpAndSettle();
-    await tapKey(tester, 'start-lang-en');
+    await tapKey(tester, 'attract');
+    await tapKey(tester, 'lang-en');
     expect(find.text('Take away'), findsOneWidget);
     await tapKey(tester, 'mode-takeAway');
     expect(find.text('Burgers'), findsWidgets);
-    expect(find.text('View order'), findsOneWidget);
+    expect(find.text('Pick something from the menu'), findsOneWidget);
   });
 
   testWidgets('an idle customer is asked, then the kiosk resets', (

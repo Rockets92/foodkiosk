@@ -1,8 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../scope.dart';
+import '../theme.dart';
+import 'pressable.dart';
 
 /// Resets the kiosk when a customer walks away mid-order: after the idle
 /// timeout it asks "are you still there?" and resets if nobody answers.
@@ -71,6 +74,7 @@ class _IdleWatcherState extends State<IdleWatcher> {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
+    final total = widget.confirmTime.inSeconds;
     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: (_) {
@@ -82,37 +86,68 @@ class _IdleWatcherState extends State<IdleWatcher> {
           if (_secondsLeft != null)
             Positioned.fill(
               child: ColoredBox(
-                color: Colors.black54,
+                color: Colors.black.withValues(alpha: 0.6),
                 child: Center(
-                  child: Card(
-                    key: const ValueKey('idle-dialog'),
-                    child: Padding(
-                      padding: const EdgeInsets.all(40),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            t('stillThere'),
-                            style: const TextStyle(
-                              fontSize: 40,
-                              fontWeight: FontWeight.w900,
+                  child:
+                      Container(
+                        key: const ValueKey('idle-dialog'),
+                        width: 680,
+                        padding: const EdgeInsets.all(48),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(40),
+                          boxShadow: K.shadowStrong,
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox.square(
+                              dimension: 160,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  SizedBox.expand(
+                                    child: CircularProgressIndicator(
+                                      value: _secondsLeft! / total,
+                                      strokeWidth: 12,
+                                      color: K.red,
+                                      backgroundColor: K.line,
+                                    ),
+                                  ),
+                                  Text(
+                                    '$_secondsLeft',
+                                    style: KText.display.copyWith(fontSize: 64),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            t('stillThereHint', args: {'n': _secondsLeft!}),
-                            style: const TextStyle(fontSize: 24),
-                          ),
-                          const SizedBox(height: 32),
-                          FilledButton(
-                            key: const ValueKey('idle-continue'),
-                            onPressed: _stay,
-                            child: Text(t('continue')),
-                          ),
-                        ],
+                            const SizedBox(height: 28),
+                            Text(
+                              t('stillThere'),
+                              textAlign: TextAlign.center,
+                              style: KText.h1,
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              t('stillThereHint', args: {'n': _secondsLeft!}),
+                              textAlign: TextAlign.center,
+                              style: KText.body,
+                            ),
+                            const SizedBox(height: 36),
+                            KButton(
+                              key: const ValueKey('idle-continue'),
+                              label: t('continue'),
+                              height: 96,
+                              expand: true,
+                              onTap: _stay,
+                            ),
+                          ],
+                        ),
+                      ).animate().scale(
+                        begin: const Offset(0.85, 0.85),
+                        duration: 400.ms,
+                        curve: Curves.easeOutBack,
                       ),
-                    ),
-                  ),
                 ),
               ),
             ),

@@ -118,4 +118,25 @@ void main() {
     final back = Order.fromJson(order.toJson());
     expect(back.totalCents, order.totalCents);
   });
+
+  test('product badge and option pictures survive JSON', () {
+    const product = Product(
+      id: 'p',
+      categoryId: 'c',
+      name: LocalizedText({'it': 'Panino'}),
+      priceCents: 500,
+      badge: LocalizedText({'it': 'Novità', 'en': 'New'}),
+    );
+    final back = Product.fromJson(product.toJson());
+    expect(back.badge.resolve('en'), 'New');
+    const option = ModifierOption(
+      id: 'o',
+      name: LocalizedText({'it': 'Patatine'}),
+      imageUrl: '/media/fries.png',
+    );
+    expect(
+      ModifierOption.fromJson(option.toJson()).imageUrl,
+      '/media/fries.png',
+    );
+  });
 }

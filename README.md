@@ -38,7 +38,12 @@ Il flusso per il cliente: schermata di attesa → lingua e "mangio qui / porto
 via" → menu per categorie → dettaglio prodotto (foto, descrizione,
 calorie, allergeni, varianti obbligatorie ed extra, quantità) → carrello →
 pagamento sul totem, in cassa o a scelta del cliente, secondo il flusso
-configurato → numero d'ordine. Se il cliente si allontana, dopo il tempo di
+configurato → numero d'ordine. L'interfaccia è animata come nei totem delle
+grandi catene: sfondo a raggi che ruota con i prodotti in evidenza, schede
+che entrano in sequenza, il prodotto che "vola" nel carrello con l'aggiunta
+rapida (+), banner promozionale per i prodotti con etichetta ("Novità", "Il
+più amato"), suggerimenti "Completa il tuo pasto" nel carrello e coriandoli
+alla conferma. Se il cliente si allontana, dopo il tempo di
 inattività il totem chiede "Sei ancora lì?" e poi ricomincia, annullando
 l'eventuale ordine non pagato.
 
@@ -66,8 +71,10 @@ oppure dal **menu staff**: tieni premuto 3 secondi l'angolo in alto a
 sinistra, inserisci il PIN staff e imposta l'indirizzo. Dallo stesso menu si
 ricarica il menu o si chiude l'app.
 
-Logo e colori sono segnaposto: i colori stanno in
-`apps/kiosk/lib/src/ui/theme.dart`, il logo è servito dal server. Le
+Logo, colori e immagini sono segnaposto: i colori stanno in
+`apps/kiosk/lib/src/ui/theme.dart`, il logo e le illustrazioni dei prodotti
+demo sono serviti dal server (`server/lib/src/illustrations.dart`) finché il
+locale non carica le proprie foto. Il font è Poppins (licenza OFL, incluso). Le
 traduzioni dell'interfaccia sono in `apps/kiosk/lib/src/i18n.dart`: per
 aggiungere una lingua basta un nuovo blocco di testi e abilitarla nelle
 impostazioni.

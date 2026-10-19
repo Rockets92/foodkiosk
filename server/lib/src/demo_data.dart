@@ -14,32 +14,32 @@ final demoMenu = Menu(
     Category(
       id: 'menu',
       name: _t('Menu', 'Meals'),
-      imageUrl: _img('Menu'),
+      imageUrl: _img('meal-classic'),
       sortOrder: 0,
       description: _t('Panino, contorno e bibita', 'Burger, side and drink'),
     ),
     Category(
       id: 'burger',
       name: _t('Panini', 'Burgers'),
-      imageUrl: _img('Panini'),
+      imageUrl: _img('burger'),
       sortOrder: 1,
     ),
     Category(
       id: 'sides',
       name: _t('Contorni', 'Sides'),
-      imageUrl: _img('Contorni'),
+      imageUrl: _img('fries'),
       sortOrder: 2,
     ),
     Category(
       id: 'drinks',
       name: _t('Bibite', 'Drinks'),
-      imageUrl: _img('Bibite'),
+      imageUrl: _img('cola'),
       sortOrder: 3,
     ),
     Category(
       id: 'desserts',
       name: _t('Dolci', 'Desserts'),
-      imageUrl: _img('Dolci'),
+      imageUrl: _img('sundae'),
       sortOrder: 4,
     ),
   ],
@@ -52,11 +52,13 @@ final demoMenu = Menu(
       options: [
         ModifierOption(
           id: 'size-m',
+          imageUrl: _img('cup-medium'),
           name: _t('Medio', 'Medium'),
           selectedByDefault: true,
         ),
         ModifierOption(
           id: 'size-l',
+          imageUrl: _img('cup-large'),
           name: _t('Grande', 'Large'),
           priceDeltaCents: 80,
         ),
@@ -70,16 +72,19 @@ final demoMenu = Menu(
       options: [
         ModifierOption(
           id: 'side-fries',
+          imageUrl: _img('fries'),
           name: _t('Patatine', 'Fries'),
           selectedByDefault: true,
         ),
         ModifierOption(
           id: 'side-wedges',
+          imageUrl: _img('wedges'),
           name: _t('Patate rustiche', 'Potato wedges'),
           priceDeltaCents: 50,
         ),
         ModifierOption(
           id: 'side-salad',
+          imageUrl: _img('salad'),
           name: _t('Insalata', 'Salad'),
           allergens: [Allergen.mustard],
         ),
@@ -93,19 +98,23 @@ final demoMenu = Menu(
       options: [
         ModifierOption(
           id: 'drink-cola',
+          imageUrl: _img('cola'),
           name: _t('Cola', 'Cola'),
           selectedByDefault: true,
         ),
         ModifierOption(
           id: 'drink-orange',
+          imageUrl: _img('orange'),
           name: _t('Aranciata', 'Orange soda'),
         ),
         ModifierOption(
           id: 'drink-water',
+          imageUrl: _img('water'),
           name: _t('Acqua naturale', 'Still water'),
         ),
         ModifierOption(
           id: 'drink-beer',
+          imageUrl: _img('beer'),
           name: _t('Birra', 'Beer'),
           priceDeltaCents: 150,
           allergens: [Allergen.gluten],
@@ -120,23 +129,27 @@ final demoMenu = Menu(
       options: [
         ModifierOption(
           id: 'extra-cheese',
+          imageUrl: _img('cheese'),
           name: _t('Formaggio extra', 'Extra cheese'),
           priceDeltaCents: 60,
           allergens: [Allergen.milk],
         ),
         ModifierOption(
           id: 'extra-bacon',
+          imageUrl: _img('bacon'),
           name: _t('Bacon', 'Bacon'),
           priceDeltaCents: 100,
         ),
         ModifierOption(
           id: 'extra-egg',
+          imageUrl: _img('egg'),
           name: _t('Uovo', 'Egg'),
           priceDeltaCents: 80,
           allergens: [Allergen.eggs],
         ),
         ModifierOption(
           id: 'extra-jalapeno',
+          imageUrl: _img('jalapeno'),
           name: _t('Jalapeño', 'Jalapeño'),
           priceDeltaCents: 50,
         ),
@@ -164,17 +177,20 @@ final demoMenu = Menu(
       options: [
         ModifierOption(
           id: 'sauce-ketchup',
+          imageUrl: _img('ketchup'),
           name: _t('Ketchup', 'Ketchup'),
           priceDeltaCents: 30,
         ),
         ModifierOption(
           id: 'sauce-mayo',
+          imageUrl: _img('mayo'),
           name: _t('Maionese', 'Mayonnaise'),
           priceDeltaCents: 30,
           allergens: [Allergen.eggs, Allergen.mustard],
         ),
         ModifierOption(
           id: 'sauce-bbq',
+          imageUrl: _img('bbq'),
           name: _t('Barbecue', 'Barbecue'),
           priceDeltaCents: 30,
           allergens: [Allergen.mustard, Allergen.celery],
@@ -189,11 +205,13 @@ final demoMenu = Menu(
       options: [
         ModifierOption(
           id: 'dsize-m',
+          imageUrl: _img('cup-medium'),
           name: _t('Medio 40cl', 'Medium 40cl'),
           selectedByDefault: true,
         ),
         ModifierOption(
           id: 'dsize-l',
+          imageUrl: _img('cup-large'),
           name: _t('Grande 50cl', 'Large 50cl'),
           priceDeltaCents: 50,
         ),
@@ -203,6 +221,7 @@ final demoMenu = Menu(
   products: [
     Product(
       id: 'menu-classic',
+      badge: _t('Il più amato', 'Best seller'),
       categoryId: 'menu',
       sortOrder: 0,
       priceCents: 990,
@@ -211,7 +230,7 @@ final demoMenu = Menu(
         'Classic Burger con contorno e bibita a scelta',
         'Classic Burger with your choice of side and drink',
       ),
-      imageUrl: _img('Menu Classic'),
+      imageUrl: _img('meal-classic'),
       kcal: 1050,
       allergens: [
         Allergen.gluten,
@@ -237,7 +256,7 @@ final demoMenu = Menu(
         'Crispy Chicken con contorno e bibita a scelta',
         'Crispy Chicken with your choice of side and drink',
       ),
-      imageUrl: _img('Menu Chicken'),
+      imageUrl: _img('meal-chicken'),
       kcal: 980,
       allergens: [
         Allergen.gluten,
@@ -262,7 +281,7 @@ final demoMenu = Menu(
         'Burger vegetale con contorno e bibita',
         'Plant-based burger with side and drink',
       ),
-      imageUrl: _img('Menu Veggie'),
+      imageUrl: _img('meal-veggie'),
       kcal: 870,
       tags: [DietaryTag.vegan],
       allergens: [Allergen.gluten, Allergen.soy, Allergen.sesame],
@@ -283,7 +302,7 @@ final demoMenu = Menu(
         'Manzo 150g, cheddar, insalata, pomodoro, cipolla, cetriolini e salsa della casa',
         '150g beef, cheddar, lettuce, tomato, onion, pickles and house sauce',
       ),
-      imageUrl: _img('Classic Burger'),
+      imageUrl: _img('burger'),
       kcal: 640,
       allergens: [
         Allergen.gluten,
@@ -295,6 +314,7 @@ final demoMenu = Menu(
     ),
     Product(
       id: 'double-bacon',
+      badge: _t('Novità', 'New'),
       categoryId: 'burger',
       sortOrder: 1,
       priceCents: 850,
@@ -303,7 +323,7 @@ final demoMenu = Menu(
         'Doppio manzo, doppio cheddar, bacon croccante e salsa barbecue',
         'Double beef, double cheddar, crispy bacon and barbecue sauce',
       ),
-      imageUrl: _img('Double Bacon'),
+      imageUrl: _img('burger-double'),
       kcal: 920,
       allergens: [
         Allergen.gluten,
@@ -324,7 +344,7 @@ final demoMenu = Menu(
         'Pollo impanato croccante, insalata e maionese',
         'Crispy breaded chicken, lettuce and mayonnaise',
       ),
-      imageUrl: _img('Crispy Chicken'),
+      imageUrl: _img('burger-chicken'),
       kcal: 590,
       allergens: [
         Allergen.gluten,
@@ -344,7 +364,7 @@ final demoMenu = Menu(
         'Burger vegetale, pomodoro, insalata e salsa vegana',
         'Plant-based patty, tomato, lettuce and vegan sauce',
       ),
-      imageUrl: _img('Veggie Burger'),
+      imageUrl: _img('burger-veggie'),
       kcal: 510,
       tags: [DietaryTag.vegan],
       allergens: [Allergen.gluten, Allergen.soy, Allergen.sesame],
@@ -356,7 +376,7 @@ final demoMenu = Menu(
       sortOrder: 0,
       priceCents: 300,
       name: _t('Patatine fritte', 'French fries'),
-      imageUrl: _img('Patatine'),
+      imageUrl: _img('fries'),
       kcal: 340,
       tags: [DietaryTag.vegan, DietaryTag.glutenFree],
       modifierGroupIds: ['sauces'],
@@ -367,7 +387,7 @@ final demoMenu = Menu(
       sortOrder: 1,
       priceCents: 450,
       name: _t('Chicken Nuggets (6 pz)', 'Chicken Nuggets (6 pcs)'),
-      imageUrl: _img('Nuggets'),
+      imageUrl: _img('nuggets'),
       kcal: 280,
       allergens: [Allergen.gluten, Allergen.celery],
       modifierGroupIds: ['sauces'],
@@ -378,7 +398,7 @@ final demoMenu = Menu(
       sortOrder: 2,
       priceCents: 350,
       name: _t('Anelli di cipolla', 'Onion rings'),
-      imageUrl: _img('Onion Rings'),
+      imageUrl: _img('onion-rings'),
       kcal: 320,
       tags: [DietaryTag.vegetarian],
       allergens: [Allergen.gluten, Allergen.milk],
@@ -391,7 +411,7 @@ final demoMenu = Menu(
       priceCents: 280,
       vatRate: 22,
       name: _t('Cola', 'Cola'),
-      imageUrl: _img('Cola'),
+      imageUrl: _img('cola'),
       kcal: 170,
       modifierGroupIds: ['drink-size'],
     ),
@@ -402,7 +422,7 @@ final demoMenu = Menu(
       priceCents: 280,
       vatRate: 22,
       name: _t('Aranciata', 'Orange soda'),
-      imageUrl: _img('Aranciata'),
+      imageUrl: _img('orange'),
       kcal: 180,
       modifierGroupIds: ['drink-size'],
     ),
@@ -413,7 +433,7 @@ final demoMenu = Menu(
       priceCents: 150,
       vatRate: 22,
       name: _t('Acqua naturale 50cl', 'Still water 50cl'),
-      imageUrl: _img('Acqua'),
+      imageUrl: _img('water'),
       kcal: 0,
     ),
     Product(
@@ -423,7 +443,7 @@ final demoMenu = Menu(
       priceCents: 450,
       vatRate: 22,
       name: _t('Birra alla spina 40cl', 'Draught beer 40cl'),
-      imageUrl: _img('Birra'),
+      imageUrl: _img('beer'),
       kcal: 170,
       allergens: [Allergen.gluten],
     ),
@@ -433,7 +453,7 @@ final demoMenu = Menu(
       sortOrder: 0,
       priceCents: 300,
       name: _t('Sundae al cioccolato', 'Chocolate sundae'),
-      imageUrl: _img('Sundae'),
+      imageUrl: _img('sundae'),
       kcal: 330,
       tags: [DietaryTag.vegetarian],
       allergens: [Allergen.milk, Allergen.soy],
@@ -444,7 +464,7 @@ final demoMenu = Menu(
       sortOrder: 1,
       priceCents: 350,
       name: _t('Brownie', 'Brownie'),
-      imageUrl: _img('Brownie'),
+      imageUrl: _img('brownie'),
       kcal: 410,
       tags: [DietaryTag.vegetarian],
       allergens: [Allergen.gluten, Allergen.eggs, Allergen.milk, Allergen.nuts],

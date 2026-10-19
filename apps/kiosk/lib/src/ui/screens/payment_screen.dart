@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../scope.dart';
+import '../theme.dart';
+import '../widgets/net_image.dart';
+import '../widgets/pressable.dart';
 
-/// Shown while the card terminal works, and after a failed payment.
+/// Card payment: points the customer to the terminal, then shows the
+/// way forward if the payment fails.
 class PaymentScreen extends StatelessWidget {
   const PaymentScreen({super.key});
 
@@ -10,111 +15,178 @@ class PaymentScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final k = context.kiosk;
     final t = context.t;
-    final order = k.order!;
+    final order = k.order;
+    // Already reset (cancelled) while this screen fades out.
+    if (order == null) return const SizedBox.shrink();
     final failed = k.paymentFailed;
     return Scaffold(
       key: const ValueKey('payment'),
       body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(48),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  t('paymentTitle'),
-                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                Text(t('amountToPay'), style: const TextStyle(fontSize: 24)),
-                Text(
-                  context.money(order.totalCents),
-                  style: const TextStyle(
-                    fontSize: 64,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 48),
-                if (!failed) ...[
-                  const SizedBox.square(
-                    dimension: 120,
-                    child: CircularProgressIndicator(strokeWidth: 10),
-                  ),
-                  const SizedBox(height: 32),
-                  const Icon(Icons.contactless, size: 96),
-                  const SizedBox(height: 16),
-                  Text(
-                    t('followTerminal'),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ] else ...[
-                  Icon(
-                    Icons.error_outline,
-                    size: 120,
-                    color: Colors.red.shade700,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    t('paymentFailed'),
-                    key: const ValueKey('payment-failed'),
-                    style: const TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    k.canPayAtCounterInstead
-                        ? t('paymentFailedHint')
-                        : t(k.errorKey ?? 'errorGeneric'),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 22),
-                  ),
-                  const SizedBox(height: 40),
-                  Wrap(
-                    spacing: 16,
-                    runSpacing: 16,
-                    alignment: WrapAlignment.center,
-                    children: [
-                      FilledButton.icon(
-                        key: const ValueKey('retry-payment'),
-                        onPressed: k.pay,
-                        icon: const Icon(Icons.refresh),
-                        label: Text(t('retry')),
-                      ),
-                      if (k.canPayAtCounterInstead)
-                        FilledButton.tonalIcon(
-                          key: const ValueKey('pay-counter-instead'),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(160, 72),
-                          ),
-                          onPressed: k.payAtCounterInstead,
-                          icon: const Icon(Icons.point_of_sale),
-                          label: Text(
-                            t('payCounter'),
-                            style: const TextStyle(fontSize: 24),
-                          ),
-                        ),
-                      OutlinedButton.icon(
-                        key: const ValueKey('cancel-payment'),
-                        onPressed: k.cancelAndReset,
-                        icon: const Icon(Icons.close),
-                        label: Text(t('cancelOrder')),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
+        child: Padding(
+          padding: const EdgeInsets.all(48),
+          child: Column(
+            children: [
+              const Spacer(),
+              Text(
+                t('amountToPay'),
+                style: KText.h3.copyWith(color: K.inkSoft),
+              ),
+              Text(
+                context.money(order.totalCents),
+                style: KText.display.copyWith(fontSize: 96),
+              ),
+              const SizedBox(height: 40),
+              AnimatedSwitcher(
+                duration: K.slow,
+                switchInCurve: Curves.easeOutBack,
+                child: failed
+                    ? _Failed(key: const ValueKey('f'))
+                    : const _Waiting(),
+              ),
+              const Spacer(flex: 2),
+            ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _Waiting extends StatelessWidget {
+  const _Waiting();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return Column(
+      children: [
+        SizedBox(
+          width: 520,
+          height: 520,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              for (var i = 0; i < 3; i++)
+                Container(
+                      width: 300,
+                      height: 300,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: K.red.withValues(alpha: 0.5),
+                          width: 6,
+                        ),
+                      ),
+                    )
+                    .animate(onPlay: (c) => c.repeat())
+                    .scaleXY(
+                      begin: 0.8,
+                      end: 1.7,
+                      delay: (i * 600).ms,
+                      duration: 1800.ms,
+                      curve: Curves.easeOut,
+                    )
+                    .fadeOut(delay: (i * 600).ms, duration: 1800.ms),
+              const Illustration('pos', size: 380)
+                  .animate(onPlay: (c) => c.repeat(reverse: true))
+                  .rotate(begin: -0.01, end: 0.01, duration: 1200.ms),
+            ],
+          ),
+        ),
+        Text(t('followTerminal'), textAlign: TextAlign.center, style: KText.h1),
+        const SizedBox(height: 28),
+        const Icon(
+              Icons.keyboard_double_arrow_down_rounded,
+              size: 96,
+              color: K.red,
+            )
+            .animate(onPlay: (c) => c.repeat(reverse: true))
+            .moveY(
+              begin: -10,
+              end: 14,
+              duration: 700.ms,
+              curve: Curves.easeInOut,
+            ),
+        Text(t('posBelow'), style: KText.h3.copyWith(color: K.red)),
+      ],
+    );
+  }
+}
+
+class _Failed extends StatelessWidget {
+  const _Failed({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final k = context.kiosk;
+    final t = context.t;
+    return Column(
+      children: [
+        Container(
+          width: 200,
+          height: 200,
+          decoration: const BoxDecoration(
+            color: Color(0xFFFFE9E5),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.credit_card_off_rounded,
+            size: 110,
+            color: K.red,
+          ),
+        ).animate().shake(hz: 5, duration: 600.ms),
+        const SizedBox(height: 28),
+        Text(
+          t('paymentFailed'),
+          key: const ValueKey('payment-failed'),
+          style: KText.h1,
+        ),
+        const SizedBox(height: 10),
+        Text(
+          k.canPayAtCounterInstead
+              ? t('paymentFailedHint')
+              : t(k.errorKey ?? 'errorGeneric'),
+          textAlign: TextAlign.center,
+          style: KText.body.copyWith(fontSize: 24),
+        ),
+        const SizedBox(height: 44),
+        SizedBox(
+          width: 640,
+          child: Column(
+            children: [
+              KButton(
+                key: const ValueKey('retry-payment'),
+                label: t('retry'),
+                icon: Icons.refresh_rounded,
+                height: 96,
+                expand: true,
+                onTap: k.pay,
+              ),
+              if (k.canPayAtCounterInstead) ...[
+                const SizedBox(height: 16),
+                KButton(
+                  key: const ValueKey('pay-counter-instead'),
+                  label: t('payCounter'),
+                  icon: Icons.point_of_sale_rounded,
+                  color: K.ink,
+                  height: 96,
+                  expand: true,
+                  onTap: k.payAtCounterInstead,
+                ),
+              ],
+              const SizedBox(height: 16),
+              KButton.secondary(
+                key: const ValueKey('cancel-payment'),
+                label: t('cancelOrder'),
+                icon: Icons.close_rounded,
+                height: 88,
+                expand: true,
+                onTap: k.cancelAndReset,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
