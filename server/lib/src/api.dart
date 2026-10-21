@@ -184,6 +184,17 @@ class Api {
         );
       })
       ..get('/staff/orders', _listOrders)
+      ..post('/staff/orders', (Request req) async {
+        final body = await _body(req);
+        final method = body['payment'] as String?;
+        final order = await orders.create(
+          OrderRequest.fromJson(body),
+          origin: OrderOrigin.counter,
+          payMethod: method == null || method.isEmpty ? null : method,
+          issueFiscal: body['issueFiscal'] as bool? ?? true,
+        );
+        return _ok(order.toJson(), status: 201);
+      })
       ..get(
         '/staff/summary',
         (Request req) => _ok(

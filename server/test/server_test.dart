@@ -277,6 +277,49 @@ void main() {
       expect(s2, 409, reason: 'no double charge');
     });
 
+    test('the cashier enters and cashes an order at the till', () async {
+      await configure({
+        'flow': FlowConfig.fullService.toJson(),
+        'payment': {
+          'type': 'demo',
+          'options': {'delayMs': 0},
+        },
+      });
+      final (s, order) = await call(
+        'POST',
+        '/api/staff/orders',
+        body: {
+          'serviceMode': 'takeAway',
+          'lines': [burgerMeal()],
+          'payment': 'cash',
+        },
+        staff: true,
+      );
+      expect(s, 201, reason: '$order');
+      expect(order['origin'], 'counter');
+      expect(order['paymentMode'], 'counter');
+      expect(order['paymentStatus'], 'paid');
+      expect(order['payment']['provider'], 'cash');
+      expect(order['kitchenStatus'], 'queued');
+      expect(order['fiscalDocument']['number'], startsWith('DEMO-'));
+      final (_, jobs) = await call(
+        'GET',
+        '/api/staff/print-jobs?orderId=${order['id']}',
+        staff: true,
+      );
+      expect(jobs['jobs'], hasLength(1), reason: 'one paid ticket');
+      expect(jobs['jobs'][0]['content'], isNot(contains('Paga in cassa')));
+
+      final (s2, _) = await call(
+        'POST',
+        '/api/staff/orders',
+        body: {
+          'lines': [burgerMeal()],
+        },
+      );
+      expect(s2, 401, reason: 'needs the staff PIN');
+    });
+
     test('declined payment can fall back to the counter', () async {
       await configure({
         'flow': FlowConfig.fullService.toJson(),

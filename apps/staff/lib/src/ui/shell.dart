@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kiosk_core/kiosk_core.dart';
 
 import '../session.dart';
 import 'screens/dashboard_screen.dart';
@@ -21,6 +22,17 @@ enum Section {
   final String label;
   final IconData icon;
   const Section(this.label, this.icon);
+
+  /// Kitchen and pickup screens only appear when the order flow uses them
+  /// (e.g. not with "Solo ordine", where another system runs the kitchen).
+  bool usedBy(FlowConfig flow) {
+    bool uses(FlowAction a) => flow.rules.values.any((l) => l.contains(a));
+    return switch (this) {
+      Section.kitchen => uses(FlowAction.sendToKitchenDisplay),
+      Section.pickup => uses(FlowAction.announceOnPickupScreen),
+      _ => true,
+    };
+  }
 }
 
 /// Side navigation and the selected section. Kitchen and pickup screens
@@ -44,7 +56,7 @@ class _StaffShellState extends State<StaffShell> {
 
   void _toggleFullscreen() => setState(() => _fullscreen = !_fullscreen);
 
-  Widget _page(StaffSession session) => switch (_section) {
+  Widget _page(StaffSession session, Section section) => switch (section) {
     Section.dashboard => const DashboardScreen(),
     Section.orders => const OrdersScreen(),
     Section.kitchen => KitchenScreen(
@@ -63,13 +75,22 @@ class _StaffShellState extends State<StaffShell> {
   @override
   Widget build(BuildContext context) {
     final session = context.staff;
-    final page = KeyedSubtree(key: ValueKey(_section), child: _page(session));
+    final sections = [
+      for (final s in Section.values)
+        if (s.usedBy(session.settings.flow)) s,
+    ];
+    final section = sections.contains(_section) ? _section : Section.orders;
+    final page = KeyedSubtree(
+      key: ValueKey(section),
+      child: _page(session, section),
+    );
     if (_fullscreen) return Scaffold(body: page);
     return Scaffold(
       body: Row(
         children: [
           _Rail(
-            selected: _section,
+            sections: sections,
+            selected: section,
             venue: session.settings.venueName,
             demo: session.settings.demoMode,
             onSelect: (s) => setState(() => _section = s),
@@ -93,6 +114,7 @@ class _StaffShellState extends State<StaffShell> {
 }
 
 class _Rail extends StatelessWidget {
+  final List<Section> sections;
   final Section selected;
   final String venue;
   final bool demo;
@@ -100,6 +122,7 @@ class _Rail extends StatelessWidget {
   final VoidCallback onLogout;
 
   const _Rail({
+    required this.sections,
     required this.selected,
     required this.venue,
     required this.demo,
@@ -141,7 +164,7 @@ class _Rail extends StatelessWidget {
               child: SingleChildScrollView(
                 child: Column(
                   children: [
-                    for (final s in Section.values)
+                    for (final s in sections)
                       _RailItem(
                         section: s,
                         selected: s == selected,

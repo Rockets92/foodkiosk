@@ -57,7 +57,16 @@ class OrderService {
   // ---------------------------------------------------------------------
   // Creation
 
-  Future<Order> create(OrderRequest req) async {
+  /// A kiosk order, or with [origin] counter one the cashier enters for a
+  /// customer at the till: always paid at the counter and, when
+  /// [payMethod] is given, paid on the spot (before the "submitted"
+  /// actions run, so the ticket prints as paid).
+  Future<Order> create(
+    OrderRequest req, {
+    OrderOrigin origin = OrderOrigin.kiosk,
+    String? payMethod,
+    bool issueFiscal = true,
+  }) async {
     final s = _s;
     if (req.lines.isEmpty) {
       throw ApiException.badRequest('emptyOrder', 'The order has no items.');
@@ -72,17 +81,19 @@ class OrderService {
         ? req.language
         : s.defaultLanguage;
 
-    final paymentMode = switch (s.flow.paymentMode) {
-      PaymentMode.customerChoice => switch (req.paymentChoice) {
-        PaymentMode.kiosk => PaymentMode.kiosk,
-        PaymentMode.counter => PaymentMode.counter,
-        _ => throw ApiException.badRequest(
-          'paymentChoiceRequired',
-          'Choose whether to pay on the kiosk or at the counter.',
-        ),
-      },
-      final mode => mode,
-    };
+    final paymentMode = origin == OrderOrigin.counter
+        ? PaymentMode.counter
+        : switch (s.flow.paymentMode) {
+            PaymentMode.customerChoice => switch (req.paymentChoice) {
+              PaymentMode.kiosk => PaymentMode.kiosk,
+              PaymentMode.counter => PaymentMode.counter,
+              _ => throw ApiException.badRequest(
+                'paymentChoiceRequired',
+                'Choose whether to pay on the kiosk or at the counter.',
+              ),
+            },
+            final mode => mode,
+          };
 
     final menu = _menu.loadForKiosk();
     final lines = [
@@ -92,26 +103,53 @@ class OrderService {
     final order = _db.transaction(() {
       final now = _clock();
       if (s.enforcesStock) _takeStock(lines);
-      final order = Order(
-        id: newId(),
-        number: _orders.nextNumber(now),
-        createdAt: now,
-        serviceMode: req.serviceMode,
-        language: language,
-        lines: lines,
-        paymentMode: paymentMode,
-        paymentStatus: switch (paymentMode) {
-          PaymentMode.kiosk => PaymentStatus.awaitingKiosk,
-          PaymentMode.counter => PaymentStatus.awaitingCounter,
-          _ => PaymentStatus.notRequired,
-        },
-        isDemo: s.demoMode,
-      ).withEvent('created', at: now);
+      final order =
+          Order(
+            id: newId(),
+            number: _orders.nextNumber(now),
+            createdAt: now,
+            serviceMode: req.serviceMode,
+            language: language,
+            lines: lines,
+            paymentMode: paymentMode,
+            paymentStatus: switch (paymentMode) {
+              PaymentMode.kiosk => PaymentStatus.awaitingKiosk,
+              PaymentMode.counter => PaymentStatus.awaitingCounter,
+              _ => PaymentStatus.notRequired,
+            },
+            isDemo: s.demoMode,
+            origin: origin,
+          ).withEvent(
+            origin == OrderOrigin.counter ? 'createdAtCounter' : 'created',
+            at: now,
+          );
       _orders.insert(order);
       return order;
     });
     _bus.emit(ServerEvent.orderCreated, order.toJson());
-    return _complete(await _runEvent(order, FlowEvent.submitted));
+    if (payMethod == null) {
+      return _complete(await _runEvent(order, FlowEvent.submitted));
+    }
+    var paid = _save(
+      order
+          .copyWith(
+            paymentStatus: PaymentStatus.paid,
+            payment: PaymentInfo(provider: payMethod, at: _clock()),
+          )
+          .withEvent('paid', detail: payMethod),
+    );
+    final submitted = s.flow.actionsFor(FlowEvent.submitted);
+    paid = await _runEvent(paid, FlowEvent.submitted);
+    paid = await _runEvent(
+      paid,
+      FlowEvent.paid,
+      skip: {
+        if (!issueFiscal) FlowAction.issueFiscalDocument,
+        if (submitted.contains(FlowAction.printCustomerTicket))
+          FlowAction.printCustomerTicket,
+      },
+    );
+    return _complete(paid);
   }
 
   OrderLine _priceLine(Menu menu, OrderRequestLine req, ServiceMode mode) {

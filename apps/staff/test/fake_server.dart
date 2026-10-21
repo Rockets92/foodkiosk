@@ -135,6 +135,46 @@ class FakeServer {
         return _json({
           'orders': [for (final o in orders) o.toJson()],
         });
+      case ('POST', '/api/staff/orders'):
+        final request = OrderRequest.fromJson(body);
+        final lines = [
+          for (final l in request.lines)
+            OrderLine(
+              productId: l.productId,
+              name: menu.product(l.productId)!.name,
+              quantity: l.quantity,
+              unitPriceCents: menu.product(l.productId)!.priceCents,
+              vatRate: 10,
+              options: [
+                for (final id in l.optionIds)
+                  OrderLineOption(
+                    groupId: 'extras',
+                    optionId: id,
+                    name: tx(id),
+                    priceDeltaCents: 100,
+                  ),
+              ],
+            ),
+        ];
+        final method = body['payment'] as String?;
+        final order = Order(
+          id: 'o${orders.length + 100}',
+          number: orders.length + 100,
+          createdAt: DateTime.now(),
+          serviceMode: request.serviceMode,
+          language: 'it',
+          lines: lines,
+          paymentMode: PaymentMode.counter,
+          origin: OrderOrigin.counter,
+          paymentStatus: method == null
+              ? PaymentStatus.awaitingCounter
+              : PaymentStatus.paid,
+          payment: method == null
+              ? null
+              : PaymentInfo(provider: method, at: DateTime.now()),
+        );
+        orders.add(order);
+        return _json(order.toJson(), 201);
       case ('GET', '/api/kitchen/orders'):
         return _json({
           'orders': [

@@ -218,6 +218,24 @@ class StaffApi {
     ];
   }
 
+  /// An order entered at the till; with [payment] (`cash`, `card`) it is
+  /// cashed at once.
+  Future<Order> createCounterOrder(
+    OrderRequest request, {
+    String? payment,
+    bool issueFiscal = true,
+  }) async => Order.fromJson(
+    await _map(
+      'POST',
+      '/api/staff/orders',
+      body: {
+        ...request.toJson(),
+        'payment': ?payment,
+        'issueFiscal': issueFiscal,
+      },
+    ),
+  );
+
   Future<Order> markPaid(
     String id, {
     required String method,

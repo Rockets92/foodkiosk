@@ -160,4 +160,49 @@ void main() {
     await tapKey(tester, 'product-available-burger');
     expect(fake.menu.product('burger')!.soldOut, isTrue);
   });
+
+  testWidgets('the cashier enters an order and cashes it', (tester) async {
+    final fake = FakeServer();
+    await openShell(tester, fake, Section.orders);
+
+    await tapKey(tester, 'orders-new');
+    expect(find.byKey(const ValueKey('new-order')), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('new-order-cash')))
+          .onPressed,
+      isNull,
+      reason: 'nothing to cash yet',
+    );
+
+    await tapKey(tester, 'new-order-product-burger');
+    await tapKey(tester, 'option-bacon');
+    await tapKey(tester, 'options-add');
+    await tapKey(tester, 'line-plus');
+    expect(find.text('15,00 €'), findsWidgets);
+
+    await tapKey(tester, 'new-order-cat-drinks');
+    await tapKey(tester, 'new-order-product-cola');
+    await tapKey(tester, 'new-order-cash');
+
+    final order = fake.orders.single;
+    expect(order.origin, OrderOrigin.counter);
+    expect(order.payment?.provider, 'cash');
+    expect(order.lines.first.quantity, 2);
+    expect(order.lines.first.options.single.optionId, 'bacon');
+    expect(order.lines.last.productId, 'cola');
+    expect(find.byKey(const ValueKey('new-order')), findsNothing);
+    expect(find.byKey(ValueKey('order-row-${order.number}')), findsOneWidget);
+  });
+
+  testWidgets('kitchen and pickup are hidden when the flow does not use them', (
+    tester,
+  ) async {
+    final fake = FakeServer()
+      ..settings = const KioskSettings(flow: FlowConfig.orderOnly);
+    await openShell(tester, fake, Section.kitchen);
+    expect(find.byKey(const ValueKey('nav-kitchen')), findsNothing);
+    expect(find.byKey(const ValueKey('nav-pickup')), findsNothing);
+    expect(find.byKey(const ValueKey('orders')), findsOneWidget);
+  });
 }

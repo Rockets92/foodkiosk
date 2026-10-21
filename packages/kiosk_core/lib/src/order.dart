@@ -46,6 +46,18 @@ enum PaymentStatus {
       values.firstWhere((s) => s.name == code, orElse: () => notRequired);
 }
 
+/// Where the order was placed.
+enum OrderOrigin {
+  /// By the customer on a kiosk.
+  kiosk,
+
+  /// By the cashier in the staff app, for a customer at the till.
+  counter;
+
+  static OrderOrigin parse(String code) =>
+      values.firstWhere((o) => o.name == code, orElse: () => kiosk);
+}
+
 enum KitchenStatus {
   /// Not (yet) sent to the kitchen.
   none,
@@ -253,6 +265,7 @@ class Order {
   /// Created while the system was in demo mode: no real payment, no real
   /// fiscal document, no stock movement, excluded from reports.
   final bool isDemo;
+  final OrderOrigin origin;
   final PaymentInfo? payment;
   final FiscalDocument? fiscalDocument;
   final List<OrderEvent> history;
@@ -269,6 +282,7 @@ class Order {
     this.paymentStatus = PaymentStatus.notRequired,
     this.kitchenStatus = KitchenStatus.none,
     this.isDemo = false,
+    this.origin = OrderOrigin.kiosk,
     this.payment,
     this.fiscalDocument,
     this.history = const [],
@@ -311,6 +325,7 @@ class Order {
     paymentStatus: paymentStatus ?? this.paymentStatus,
     kitchenStatus: kitchenStatus ?? this.kitchenStatus,
     isDemo: isDemo,
+    origin: origin,
     payment: payment ?? this.payment,
     fiscalDocument: fiscalDocument ?? this.fiscalDocument,
     history: history ?? this.history,
@@ -342,6 +357,7 @@ class Order {
     paymentStatus: PaymentStatus.parse(json['paymentStatus'] as String? ?? ''),
     kitchenStatus: KitchenStatus.parse(json['kitchenStatus'] as String? ?? ''),
     isDemo: json['isDemo'] as bool? ?? false,
+    origin: OrderOrigin.parse(json['origin'] as String? ?? ''),
     payment: json['payment'] == null
         ? null
         : PaymentInfo.fromJson((json['payment'] as Map).cast()),
@@ -367,6 +383,7 @@ class Order {
     'paymentStatus': paymentStatus.name,
     'kitchenStatus': kitchenStatus.name,
     'isDemo': isDemo,
+    'origin': origin.name,
     'payment': payment?.toJson(),
     'fiscalDocument': fiscalDocument?.toJson(),
     'history': [for (final e in history) e.toJson()],

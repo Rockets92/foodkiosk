@@ -8,6 +8,7 @@ import '../../api.dart';
 import '../../session.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'new_order_view.dart';
 
 enum _Filter {
   toCollect('Da incassare'),
@@ -45,6 +46,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   String _search = '';
   String? _selectedId;
   DateTime _day = DateTime.now();
+  bool _composing = false;
   StreamSubscription<ServerEvent>? _sub;
   Timer? _timer;
 
@@ -137,6 +139,33 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final selected = _orders.where((o) => o.id == _selectedId).firstOrNull;
     final toCollect = _orders.where(_Filter.toCollect.matches).length;
 
+    if (_composing) {
+      return Scaffold(
+        body: NewOrderView(
+          onCancel: () => setState(() => _composing = false),
+          onDone: (order) {
+            setState(() {
+              _composing = false;
+              _day = DateTime.now();
+              _filter = _Filter.all;
+              _search = '';
+              _selectedId = order.id;
+              _orders = [
+                order,
+                for (final o in _orders)
+                  if (o.id != order.id) o,
+              ];
+            });
+            showMessage(
+              context,
+              'Ordine ${orderNumber(order.number)} incassato',
+            );
+            _load();
+          },
+        ),
+      );
+    }
+
     return Scaffold(
       key: const ValueKey('orders'),
       body: Row(
@@ -150,9 +179,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 PageHeader(
                   title: 'Cassa',
                   subtitle: _isToday
-                      ? 'Ordini di oggi · $toCollect da incassare'
+                      ? 'Oggi · $toCollect da incassare'
                       : 'Ordini del ${_day.day}/${_day.month}/${_day.year}',
                   actions: [
+                    FilledButton.icon(
+                      key: const ValueKey('orders-new'),
+                      onPressed: () => setState(() => _composing = true),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Nuovo ordine'),
+                    ),
                     OutlinedButton.icon(
                       key: const ValueKey('orders-day'),
                       onPressed: _pickDay,
@@ -213,7 +248,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       ? const EmptyState(
                           icon: Icons.receipt_long_rounded,
                           title: 'Nessun ordine',
-                          message: 'I nuovi ordini dai totem compaiono qui.',
+                          message: 'Qui compaiono gli ordini dai totem e quelli fatti in cassa.',
                         )
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(28, 4, 28, 24),
@@ -338,6 +373,10 @@ class _OrderRow extends StatelessWidget {
                             style: ST.h3,
                           ),
                         ),
+                        if (order.origin == OrderOrigin.counter) ...[
+                          const SizedBox(width: 6),
+                          const Pill('CASSA', color: S.info),
+                        ],
                         if (order.isDemo) ...[
                           const SizedBox(width: 6),
                           const Pill('DEMO', color: S.warning),
@@ -867,6 +906,7 @@ class _HistoryTile extends StatelessWidget {
 
     return switch (e.type) {
       'created' => ('Ordine creato', S.info),
+      'createdAtCounter' => ('Ordine fatto in cassa', S.info),
       'paymentStarted' => ('Pagamento avviato sul totem', S.info),
       'paymentFailed' => (
         'Pagamento rifiutato${e.detail == null ? '' : ': ${e.detail}'}',
