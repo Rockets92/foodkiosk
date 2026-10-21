@@ -40,7 +40,7 @@ Name: "staff"; Description: "App staff: cassa, cucina, ritiro, menu, impostazion
 
 [Tasks]
 Name: "desktopicons"; Description: "Icone sul desktop"
-Name: "autostartserver"; Description: "Avvia il server all'accesso a Windows"
+Name: "autostartserver"; Description: "Avvia il server all'accesso a Windows (per i PC che servono cucina e cassa)"; Flags: unchecked
 Name: "autostarttotem"; Description: "Avvia il totem a schermo intero all'accesso a Windows"; Components: totem; Flags: unchecked
 
 [Dirs]
@@ -48,33 +48,29 @@ Name: "{commonappdata}\FoodKiosk"; Permissions: users-modify
 
 [Files]
 Source: "{#SourceDir}\server\*"; DestDir: "{app}\server"; Components: server; Flags: recursesubdirs ignoreversion
-Source: "{#SourceDir}\web\*"; DestDir: "{app}\web"; Components: server; Flags: recursesubdirs ignoreversion
-Source: "{#SourceDir}\Avvia demo.bat"; DestDir: "{app}"; Components: server; Flags: ignoreversion
-Source: "{#SourceDir}\Avvia server.bat"; DestDir: "{app}"; Components: server; Flags: ignoreversion
-Source: "{#SourceDir}\LEGGIMI.txt"; DestDir: "{app}"; Components: server; Flags: ignoreversion isreadme
+Source: "{#SourceDir}\LEGGIMI.txt"; DestDir: "{app}"; Components: server; Flags: ignoreversion
 Source: "{#SourceDir}\totem\*"; DestDir: "{app}\totem"; Components: totem; Flags: recursesubdirs ignoreversion
-Source: "{#SourceDir}\Avvia totem.bat"; DestDir: "{app}"; Components: totem; Flags: ignoreversion
-Source: "{#SourceDir}\Avvia totem in finestra.bat"; DestDir: "{app}"; Components: totem; Flags: ignoreversion
 Source: "{#SourceDir}\staff\*"; DestDir: "{app}\staff"; Components: staff; Flags: recursesubdirs ignoreversion
-Source: "{#SourceDir}\Avvia staff.bat"; DestDir: "{app}"; Components: staff; Flags: ignoreversion
 
+; The totem and staff apps start the server themselves (no window); the
+; server icon is only for a PC that serves other devices.
 [Icons]
-Name: "{group}\Food Kiosk - Demo nel browser"; Filename: "{app}\Avvia demo.bat"; WorkingDir: "{app}"; IconFilename: "{app}\server\bin\FoodKioskServer.exe"
-Name: "{group}\Food Kiosk - Server"; Filename: "{app}\Avvia server.bat"; WorkingDir: "{app}"; IconFilename: "{app}\server\bin\FoodKioskServer.exe"
-Name: "{group}\Food Kiosk - Totem"; Filename: "{app}\Avvia totem.bat"; WorkingDir: "{app}"; IconFilename: "{app}\totem\FoodKioskTotem.exe"; Components: totem
-Name: "{group}\Food Kiosk - Totem in finestra"; Filename: "{app}\Avvia totem in finestra.bat"; WorkingDir: "{app}"; IconFilename: "{app}\totem\FoodKioskTotem.exe"; Components: totem
-Name: "{group}\Food Kiosk - Staff"; Filename: "{app}\Avvia staff.bat"; WorkingDir: "{app}"; IconFilename: "{app}\staff\FoodKioskStaff.exe"; Components: staff
+Name: "{group}\Food Kiosk Totem"; Filename: "{app}\totem\FoodKioskTotem.exe"; WorkingDir: "{app}\totem"; Components: totem
+Name: "{group}\Food Kiosk Totem in finestra"; Filename: "{app}\totem\FoodKioskTotem.exe"; Parameters: "--windowed"; WorkingDir: "{app}\totem"; Components: totem
+Name: "{group}\Food Kiosk Staff"; Filename: "{app}\staff\FoodKioskStaff.exe"; WorkingDir: "{app}\staff"; Components: staff
+Name: "{group}\Avvia solo il server"; Filename: "{app}\server\bin\FoodKioskServer.exe"; Parameters: "--background"; WorkingDir: "{app}\server\bin"; Flags: runminimized
 Name: "{group}\Leggimi"; Filename: "{app}\LEGGIMI.txt"
 Name: "{group}\Disinstalla Food Kiosk"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\Food Kiosk - Demo"; Filename: "{app}\Avvia demo.bat"; WorkingDir: "{app}"; IconFilename: "{app}\server\bin\FoodKioskServer.exe"; Tasks: desktopicons
-Name: "{autodesktop}\Food Kiosk - Totem"; Filename: "{app}\Avvia totem.bat"; WorkingDir: "{app}"; IconFilename: "{app}\totem\FoodKioskTotem.exe"; Tasks: desktopicons; Components: totem
-Name: "{autodesktop}\Food Kiosk - Staff"; Filename: "{app}\Avvia staff.bat"; WorkingDir: "{app}"; IconFilename: "{app}\staff\FoodKioskStaff.exe"; Tasks: desktopicons; Components: staff
-Name: "{commonstartup}\Food Kiosk - Server"; Filename: "{app}\server\bin\FoodKioskServer.exe"; WorkingDir: "{app}"; Flags: runminimized; Tasks: autostartserver
-Name: "{commonstartup}\Food Kiosk - Totem"; Filename: "{app}\Avvia totem.bat"; WorkingDir: "{app}"; Flags: runminimized; Tasks: autostarttotem
+Name: "{autodesktop}\Food Kiosk Totem"; Filename: "{app}\totem\FoodKioskTotem.exe"; WorkingDir: "{app}\totem"; Tasks: desktopicons; Components: totem
+Name: "{autodesktop}\Food Kiosk Totem in finestra"; Filename: "{app}\totem\FoodKioskTotem.exe"; Parameters: "--windowed"; WorkingDir: "{app}\totem"; Tasks: desktopicons; Components: totem
+Name: "{autodesktop}\Food Kiosk Staff"; Filename: "{app}\staff\FoodKioskStaff.exe"; WorkingDir: "{app}\staff"; Tasks: desktopicons; Components: staff
+Name: "{commonstartup}\Food Kiosk Server"; Filename: "{app}\server\bin\FoodKioskServer.exe"; Parameters: "--background"; WorkingDir: "{app}\server\bin"; Flags: runminimized; Tasks: autostartserver
+Name: "{commonstartup}\Food Kiosk Totem"; Filename: "{app}\totem\FoodKioskTotem.exe"; WorkingDir: "{app}\totem"; Tasks: autostarttotem
 
 [Run]
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Food Kiosk server"" dir=in action=allow program=""{app}\server\bin\FoodKioskServer.exe"" enable=yes profile=private,domain"; Flags: runhidden
-Filename: "{app}\Avvia demo.bat"; Description: "Prova subito la demo nel browser"; Flags: postinstall nowait skipifsilent shellexec
+Filename: "{app}\totem\FoodKioskTotem.exe"; Parameters: "--windowed"; Description: "Apri subito il totem in una finestra"; Components: totem; Flags: postinstall nowait skipifsilent
+Filename: "{app}\staff\FoodKioskStaff.exe"; Description: "Apri l'app staff"; Components: staff; Flags: postinstall nowait skipifsilent unchecked
 
 [UninstallRun]
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Food Kiosk server"""; Flags: runhidden; RunOnceId: "FirewallRule"

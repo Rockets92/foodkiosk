@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:args/args.dart';
@@ -32,6 +33,17 @@ Future<void> main(List<String> args) async {
           'screen, admin), served at /staff/. Default: web/staff next to '
           'the executable, when present.',
     )
+    ..addOption(
+      'log-file',
+      help: 'Append the log to this file instead of the console.',
+    )
+    ..addFlag(
+      'background',
+      negatable: false,
+      help:
+          'Start a copy of the server with no window (log in server.log in '
+          'the data folder) and return at once. Used by the Windows apps.',
+    )
     ..addFlag(
       'no-demo-menu',
       negatable: false,
@@ -49,6 +61,56 @@ Future<void> main(List<String> args) async {
       ? p.join(programData, 'FoodKiosk', 'data')
       : opts['data-dir'] as String;
   final dataDir = Directory(dataPath)..createSync(recursive: true);
+
+  if (opts['background'] as bool) {
+    final exe = Platform.resolvedExecutable;
+    if (p.basenameWithoutExtension(exe) == 'dart') {
+      stderr.writeln(
+        '--background needs the compiled server (dart build cli).',
+      );
+      exit(64);
+    }
+    await Process.start(exe, [
+      for (final a in args)
+        if (a != '--background') a,
+      if (!opts.wasParsed('log-file')) ...[
+        '--log-file',
+        p.join(dataDir.path, 'server.log'),
+      ],
+      if (!opts.wasParsed('data-dir')) ...['--data-dir', dataDir.path],
+    ], mode: ProcessStartMode.detached);
+    exit(0);
+  }
+
+  // Started with no window there is no console to write to: log to a file.
+  final logPath = opts['log-file'] as String?;
+  final logSink = logPath == null
+      ? null
+      : (File(
+          logPath,
+        )..parent.createSync(recursive: true)).openWrite(mode: FileMode.append);
+  void log(String line) {
+    if (logSink != null) {
+      logSink.writeln('${DateTime.now().toIso8601String()} $line');
+    } else {
+      stdout.writeln(line);
+    }
+  }
+
+  await runZonedGuarded(
+    () => _serve(opts, dataDir, log),
+    (e, st) => log('ERROR $e\n$st'),
+    zoneSpecification: ZoneSpecification(
+      print: (self, parent, zone, line) => log(line),
+    ),
+  );
+}
+
+Future<void> _serve(
+  ArgResults opts,
+  Directory dataDir,
+  void Function(String) log,
+) async {
   final mediaDir = Directory(p.join(dataDir.path, 'media'))..createSync();
   final app = KioskApp(
     AppDatabase.open(p.join(dataDir.path, 'foodkiosk.db')),
@@ -75,36 +137,32 @@ Future<void> main(List<String> args) async {
       if (webDir('$name-web', name) case final dir?)
         name: createStaticHandler(dir, defaultDocument: 'index.html'),
   };
-  final handler = const Pipeline().addMiddleware(logRequests()).addHandler((
-    Request req,
-  ) {
-    final path = req.url.path;
-    if (path.isEmpty && webApps.containsKey('kiosk')) {
-      return Response.found('/kiosk/');
-    }
-    for (final MapEntry(key: name, value: web) in webApps.entries) {
-      if (path == name) return Response.found('/$name/');
-      if (path.startsWith('$name/')) return web(req.change(path: name));
-    }
-    return app.handler(req);
-  });
+  final handler = const Pipeline()
+      .addMiddleware(logRequests(logger: (msg, isError) => log(msg)))
+      .addHandler((Request req) {
+        final path = req.url.path;
+        if (path.isEmpty && webApps.containsKey('kiosk')) {
+          return Response.found('/kiosk/');
+        }
+        for (final MapEntry(key: name, value: web) in webApps.entries) {
+          if (path == name) return Response.found('/$name/');
+          if (path.startsWith('$name/')) return web(req.change(path: name));
+        }
+        return app.handler(req);
+      });
   final server = await io.serve(
     handler,
     opts['host'] as String,
     int.parse(opts['port'] as String),
   );
   final s = app.settings.current;
-  stdout.writeln(
-    'Food Kiosk server on http://${server.address.host}:${server.port}',
-  );
-  stdout.writeln('  data:  ${p.absolute(dataDir.path)}');
+  log('Food Kiosk server on http://${server.address.host}:${server.port}');
+  log('  data:  ${p.absolute(dataDir.path)}');
   for (final name in webApps.keys) {
-    stdout.writeln('  $name: http://localhost:${server.port}/$name/');
+    log('  $name: http://localhost:${server.port}/$name/');
   }
-  stdout.writeln(
-    '  mode:  ${s.demoMode ? 'DEMO (payments simulated)' : 'production'}',
-  );
-  stdout.writeln('  flow:  payment=${s.flow.paymentMode.name}');
+  log('  mode:  ${s.demoMode ? 'DEMO (payments simulated)' : 'production'}');
+  log('  flow:  payment=${s.flow.paymentMode.name}');
 
   ProcessSignal.sigint.watch().listen((_) async {
     await server.close();

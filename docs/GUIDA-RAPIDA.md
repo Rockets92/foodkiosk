@@ -3,43 +3,46 @@
 Tutto parte in **modalità demo**: pagamenti e scontrini sono simulati, non
 serve nessun POS né stampante. PIN dell'area staff: **1234**.
 
-## Strada 1: pacchetto pronto (consigliata, Windows)
+## Strada 1: installer (consigliata, Windows)
+
+Totem e app staff sono programmi Windows: niente browser, e il server parte
+da solo in background quando li apri.
 
 1. Su GitHub apri il repository **foodkiosk** → scheda **Actions** → l'ultima
    esecuzione verde di **CI** sul ramo del lavoro (o su `main`).
 2. In fondo alla pagina, sotto **Artifacts**, scarica
-   **FoodKiosk-Windows-portatile** (serve essere collegati a GitHub).
-3. Estrai lo zip in una cartella, per esempio `C:\FoodKiosk`.
-4. Doppio clic su **`Avvia demo.bat`**. Si apre una finestra del server
-   (lasciala aperta) e nel browser compaiono:
-   - il **totem**: `http://localhost:8080/kiosk/`
-   - l'**area staff**: `http://localhost:8080/staff/` (PIN 1234)
+   **FoodKiosk-Windows-installer** (serve essere collegati a GitHub) ed
+   estrai `FoodKiosk-Setup.exe` dallo zip.
+3. Avvia `FoodKiosk-Setup.exe` e scegli **Tutto su questo PC**. Alla fine
+   lascia spuntato *Apri subito il totem in una finestra*.
+4. Da menu Start o desktop:
+   - **Food Kiosk Totem in finestra**: il totem in una finestra verticale,
+     comodo per provarlo sul PC;
+   - **Food Kiosk Totem**: il totem a schermo intero, come sul chiosco;
+   - **Food Kiosk Staff**: cassa, cucina, ritiro, menu e impostazioni
+     (PIN **1234**).
 
 Al primo avvio Windows può mostrare due avvisi:
 - **"Windows ha protetto il PC"** (il programma non è ancora firmato):
   *Ulteriori informazioni* → *Esegui comunque*;
-- **Firewall**: *Consenti* se vuoi collegare tablet o altri PC della rete,
-  altrimenti va bene anche *Annulla*.
-
-Altri avvii nella stessa cartella:
-
-| File | Cosa fa |
-| --- | --- |
-| `Avvia totem in finestra.bat` | Il totem come programma Windows, in una finestra verticale |
-| `Avvia totem.bat` | Il totem a schermo intero, come sul chiosco |
-| `Avvia staff.bat` | L'app staff come programma Windows |
-| `Avvia server.bat` | Solo il server, con il registro delle attività |
+- **Firewall** per FoodKioskServer: *Consenti* se vuoi collegare altri PC o
+  tablet della rete, altrimenti va bene anche *Annulla*.
 
 Per uscire dal totem a schermo intero: tieni premuto per 3 secondi l'angolo
 in alto a sinistra, inserisci il PIN e tocca **Chiudi applicazione**.
 
-C'è anche **FoodKiosk-Windows-installer** (`FoodKiosk-Setup.exe`): installa
-tutto con le icone nel menu Start, ed è quello da usare sul totem vero.
+Senza installare: scarica **FoodKiosk-Windows-portatile**, estrai lo zip e
+fai doppio clic su `totem\FoodKioskTotem.exe` o `staff\FoodKioskStaff.exe`.
 
-## Strada 2: dal codice (Windows, macOS o Linux)
+Il server resta acceso in background anche dopo aver chiuso il totem, così
+cucina e cassa continuano a ricevere gli ordini. Per spegnerlo: Gestione
+attività → FoodKioskServer → Termina attività.
+
+## Strada 2: dal codice, nel browser (per sviluppo)
 
 Serve [Flutter](https://docs.flutter.dev/get-started/install) (contiene già
-Dart) e [Git](https://git-scm.com/downloads).
+Dart) e [Git](https://git-scm.com/downloads). Funziona anche su macOS e
+Linux; la versione per il locale resta quella Windows della Strada 1.
 
 ```sh
 git clone https://github.com/Rockets92/foodkiosk.git
@@ -76,11 +79,12 @@ Finché il lavoro non è unito a `main`, dopo il `git clone` esegui
    come esaurito: il totem si aggiorna subito.
 7. **Staff → Riepilogo**: incasso, ordini e prodotti più venduti del giorno.
 
-Suggerimento: il totem è pensato per uno schermo verticale. Nel browser
-puoi vederlo così con **F12** → icona dei dispositivi → dimensione
-1080 × 1920, oppure usa `Avvia totem in finestra.bat`.
+Suggerimento: il totem è pensato per uno schermo verticale. Su un PC
+normale usa **Food Kiosk Totem in finestra**; nel browser (Strada 2) puoi
+simularlo con **F12** → icona dei dispositivi → dimensione 1080 × 1920.
 
 ## Ripartire da zero
 
-Chiudi il server e cancella la cartella `%ProgramData%\FoodKiosk\data`
-(su macOS e Linux, avviando dal codice: `server/data`). Al prossimo avvio torna il menu demo.
+Ferma il server (Gestione attività → FoodKioskServer) e cancella la
+cartella `%ProgramData%\FoodKiosk\data` (avviando dal codice su macOS e
+Linux: `server/data`). Al prossimo avvio torna il menu demo.

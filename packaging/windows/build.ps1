@@ -1,5 +1,5 @@
-# Builds the Windows package: server, totem and staff apps, web builds and
-# launchers in dist\FoodKiosk; with -Installer also dist\FoodKiosk-Setup.exe
+# Builds the Windows package: server, totem and staff apps (native Windows
+# programs; they start the server themselves) in dist\FoodKiosk; with -Installer also dist\FoodKiosk-Setup.exe
 # (needs Inno Setup 6). Requires Flutter (stable) with Visual Studio's
 # "Desktop development with C++" workload.
 param(
@@ -25,19 +25,16 @@ foreach ($app in 'kiosk', 'staff') {
   Push-Location "apps\$app"
   Run flutter @('pub', 'get')
   Run flutter @('build', 'windows', '--release')
-  Run flutter @('build', 'web', '--release', "--base-href=/$app/", '--no-web-resources-cdn')
   Pop-Location
 }
 
 if (Test-Path $Out) { Remove-Item $Out -Recurse -Force }
-New-Item -ItemType Directory -Force "$Out\web" | Out-Null
+New-Item -ItemType Directory -Force $Out | Out-Null
 Copy-Item "build\server\bundle" "$Out\server" -Recurse
 Rename-Item "$Out\server\bin\server.exe" "FoodKioskServer.exe"
-Copy-Item "apps\kiosk\build\web" "$Out\web\kiosk" -Recurse
-Copy-Item "apps\staff\build\web" "$Out\web\staff" -Recurse
 Copy-Item "apps\kiosk\build\windows\x64\runner\Release" "$Out\totem" -Recurse
 Copy-Item "apps\staff\build\windows\x64\runner\Release" "$Out\staff" -Recurse
-Copy-Item "packaging\windows\launchers\*" $Out
+Copy-Item "packaging\windows\LEGGIMI.txt" $Out
 Write-Host "Package ready in $Out"
 
 if ($Installer) {

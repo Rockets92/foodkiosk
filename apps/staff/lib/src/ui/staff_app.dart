@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../api.dart';
 import '../config.dart';
+import '../local_server.dart';
 import '../session.dart';
 import 'screens/login_screen.dart';
 import 'screens/pickup_screen.dart';
@@ -41,6 +42,7 @@ class _StaffAppState extends State<StaffApp> {
 
   Future<void> _restore() async {
     final server = await loadServerUri();
+    await ensureLocalServer(server);
     final pin = await loadPin();
     StaffSession? session;
     if (pin != null) {

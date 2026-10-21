@@ -34,8 +34,10 @@ Al primo avvio il server crea `server/data/foodkiosk.db` (su Windows
 segnaposto) e parte in **modalità demo**. PIN staff/admin predefinito: `1234`.
 
 Opzioni: `--port`, `--host`, `--data-dir`, `--no-demo-menu`, `--kiosk-web`,
-`--staff-web` (cartelle delle build web da servire su `/kiosk/` e `/staff/`;
-nel pacchetto Windows vengono trovate da sole).
+`--staff-web` (cartelle delle build web da servire su `/kiosk/` e `/staff/`,
+per sviluppo e demo da browser), `--log-file`, `--background` (riparte
+senza finestra con il registro in `server.log` nella cartella dati: è
+così che lo avviano le app Windows).
 
 ## App kiosk
 
@@ -122,13 +124,22 @@ dart run bin/server.dart --kiosk-web ../apps/kiosk/build/web --staff-web ../apps
 Ogni esecuzione della CI produce, tra gli *Artifacts* della run su GitHub
 Actions:
 
-- **FoodKiosk-Windows-portatile**: cartella pronta, si scompatta e si usa
-  (`Avvia demo.bat`, `Avvia totem.bat`, `Avvia staff.bat`, `Avvia
-  server.bat`, `LEGGIMI.txt`);
 - **FoodKiosk-Windows-installer**: `FoodKiosk-Setup.exe`, con scelta dei
-  componenti (tutto, solo totem, solo postazione staff), icone, avvio
-  automatico del server e, se richiesto, del totem all'accesso a Windows, e
-  regola del firewall per la rete locale.
+  componenti (tutto, solo totem, solo postazione staff), icone nel menu
+  Start e sul desktop, avvio automatico del totem (e, sui PC che servono
+  altri dispositivi, del server) all'accesso a Windows, e regola del
+  firewall per la rete locale;
+- **FoodKiosk-Windows-portatile**: la stessa cartella senza installazione
+  (`totem\FoodKioskTotem.exe`, `staff\FoodKioskStaff.exe`, `server\`,
+  `LEGGIMI.txt`).
+
+Totem e app staff sono **programmi Windows nativi**, senza browser: se il
+server configurato è `localhost` e non risponde, lo avviano da soli senza
+finestre (`FoodKioskServer.exe --background`, registro in
+`%ProgramData%\FoodKiosk\data\server.log`) e il server resta attivo per
+gli altri dispositivi anche dopo la chiusura dell'app. Le versioni web
+restano solo per lo sviluppo e la demo da browser (`--kiosk-web`,
+`--staff-web`).
 
 Per crearli in locale su Windows (Flutter con il carico di lavoro "Sviluppo
 di applicazioni desktop con C++" di Visual Studio, e Inno Setup 6 per
