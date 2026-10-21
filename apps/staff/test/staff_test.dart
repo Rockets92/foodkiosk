@@ -81,9 +81,27 @@ void main() {
     final fake = FakeServer()..orders = [makeOrder(7)];
     await openShell(tester, fake, Section.orders);
     await tapKey(tester, 'order-row-7');
-    await tapKey(tester, 'pay-cash');
+    await tapKey(tester, 'pay-open');
+    for (final k in '1000'.split('')) {
+      await tapKey(tester, 'pay-key-$k');
+    }
+    expect(find.text('Mancano 5,00 €'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('pay-confirm')))
+          .onPressed,
+      isNull,
+    );
+    await tapKey(tester, 'pay-key-C');
+    for (final k in '2000'.split('')) {
+      await tapKey(tester, 'pay-key-$k');
+    }
+    expect(find.text('5,00 €'), findsOneWidget, reason: 'change');
+    await tapKey(tester, 'pay-confirm');
     expect(fake.requests, contains('POST /api/staff/orders/o7/mark-paid'));
-    expect(fake.orders.single.paymentStatus, PaymentStatus.paid);
+    final paid = fake.orders.single;
+    expect(paid.paymentStatus, PaymentStatus.paid);
+    expect(paid.payment?.receivedCents, 2000);
   });
 
   testWidgets('a failed print can be retried', (tester) async {
@@ -169,7 +187,7 @@ void main() {
     expect(find.byKey(const ValueKey('new-order')), findsOneWidget);
     expect(
       tester
-          .widget<FilledButton>(find.byKey(const ValueKey('new-order-cash')))
+          .widget<FilledButton>(find.byKey(const ValueKey('new-order-pay')))
           .onPressed,
       isNull,
       reason: 'nothing to cash yet',
@@ -183,11 +201,18 @@ void main() {
 
     await tapKey(tester, 'new-order-cat-drinks');
     await tapKey(tester, 'new-order-product-cola');
-    await tapKey(tester, 'new-order-cash');
+    await tapKey(tester, 'new-order-pay');
+    await tapKey(tester, 'pay-method-mixed');
+    for (final k in '500'.split('')) {
+      await tapKey(tester, 'pay-key-$k');
+    }
+    await tapKey(tester, 'pay-confirm');
 
     final order = fake.orders.single;
     expect(order.origin, OrderOrigin.counter);
-    expect(order.payment?.provider, 'cash');
+    expect(order.payment?.provider, 'mixed');
+    expect(order.payment?.cashCents, 500);
+    expect(order.payment?.cardCents, 1500 + 280 - 500);
     expect(order.lines.first.quantity, 2);
     expect(order.lines.first.options.single.optionId, 'bacon');
     expect(order.lines.last.productId, 'cola');
@@ -204,5 +229,30 @@ void main() {
     expect(find.byKey(const ValueKey('nav-kitchen')), findsNothing);
     expect(find.byKey(const ValueKey('nav-pickup')), findsNothing);
     expect(find.byKey(const ValueKey('orders')), findsOneWidget);
+  });
+
+  testWidgets('an unpaid order can be saved, then extended before paying', (
+    tester,
+  ) async {
+    final fake = FakeServer();
+    await openShell(tester, fake, Section.orders);
+    await tapKey(tester, 'orders-new');
+    await tapKey(tester, 'new-order-cat-drinks');
+    await tapKey(tester, 'new-order-product-cola');
+    await tapKey(tester, 'new-order-save');
+    final saved = fake.orders.single;
+    expect(saved.paymentStatus, PaymentStatus.awaitingCounter);
+
+    await tapKey(tester, 'edit-order');
+    expect(find.text('Ordine ${saved.number}'), findsOneWidget);
+    await tapKey(tester, 'line-plus');
+    await tapKey(tester, 'new-order-pay');
+    await tapKey(tester, 'pay-method-card');
+    await tapKey(tester, 'pay-confirm');
+
+    final paid = fake.orders.single;
+    expect(paid.lines.single.quantity, 2);
+    expect(paid.paymentStatus, PaymentStatus.paid);
+    expect(paid.payment?.provider, 'card');
   });
 }

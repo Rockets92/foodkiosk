@@ -158,7 +158,8 @@ class _Body extends StatelessWidget {
         money(_int('revenueCents')),
         Icons.euro_rounded,
         S.success,
-        '${_int('paidOrders')} ordini pagati',
+        'contanti ${money(_int('cashCents'))} · '
+            'carta ${money(_int('cardCents'))}',
       ),
       (
         'Ordini',

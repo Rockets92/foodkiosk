@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:kiosk_core/kiosk_core.dart';
 
+import '../../api.dart';
 import '../../session.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/payment_dialog.dart';
 
 /// One line of the cashier's cart, priced from the menu for display (the
 /// server prices it again).
@@ -24,12 +26,19 @@ class _Line {
       options.length == opts.length;
 }
 
-/// Cashier: enter an order for a customer at the till and cash it.
+/// Cashier: enter an order for a customer at the till (or change the items
+/// of an unpaid one, [editing]), then cash it or leave it to pay later.
 class NewOrderView extends StatefulWidget {
-  final ValueChanged<Order> onDone;
+  final Order? editing;
+  final void Function(Order order, String message) onDone;
   final VoidCallback onCancel;
 
-  const NewOrderView({super.key, required this.onDone, required this.onCancel});
+  const NewOrderView({
+    super.key,
+    this.editing,
+    required this.onDone,
+    required this.onCancel,
+  });
 
   @override
   State<NewOrderView> createState() => _NewOrderViewState();
@@ -41,6 +50,25 @@ class _NewOrderViewState extends State<NewOrderView> {
   ServiceMode? _mode;
   bool _issueFiscal = true;
   bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final order = widget.editing;
+    if (order == null) return;
+    _mode = order.serviceMode;
+    final menu = context.staffRead.menu;
+    for (final l in order.lines) {
+      final product = menu.product(l.productId);
+      if (product == null) continue;
+      _lines.add(
+        _Line(product, [
+          for (final o in l.options)
+            ?menu.modifierGroup(o.groupId)?.option(o.optionId),
+        ], l.quantity),
+      );
+    }
+  }
 
   List<ServiceMode> _modes(StaffSession s) =>
       s.settings.serviceModes.toList()
@@ -92,32 +120,65 @@ class _NewOrderViewState extends State<NewOrderView> {
     });
   }
 
-  Future<void> _pay(String method) async {
-    final session = context.staffRead;
-    final mode = _currentMode(session);
-    setState(() => _busy = true);
-    final order = await guard(
-      context,
-      () => session.api.createCounterOrder(
-        OrderRequest(
-          serviceMode: mode,
-          language: session.settings.defaultLanguage,
-          lines: [
-            for (final l in _lines)
-              OrderRequestLine(
-                productId: l.product.id,
-                quantity: l.quantity,
-                optionIds: [for (final o in l.options) o.id],
-              ),
-          ],
+  OrderRequest _request(StaffSession session) => OrderRequest(
+    serviceMode: _currentMode(session),
+    language: widget.editing?.language ?? session.settings.defaultLanguage,
+    lines: [
+      for (final l in _lines)
+        OrderRequestLine(
+          productId: l.product.id,
+          quantity: l.quantity,
+          optionIds: [for (final o in l.options) o.id],
         ),
-        payment: method,
+    ],
+  );
+
+  /// Saves the order and, with [pay], asks for the payment and cashes it.
+  Future<void> _save({required bool pay}) async {
+    final session = context.staffRead;
+    final money = session.money;
+    final total = _total;
+    CounterPayment? payment;
+    if (pay) {
+      payment = await showPaymentDialog(context, totalCents: total);
+      if (payment == null || !mounted) return;
+    }
+    setState(() => _busy = true);
+    final editing = widget.editing;
+    final order = await guard(context, () async {
+      if (editing == null) {
+        return session.api.createCounterOrder(
+          _request(session),
+          payment: payment,
+          issueFiscal: _issueFiscal,
+        );
+      }
+      final saved = await session.api.editOrderLines(
+        editing.id,
+        _request(session),
+      );
+      if (payment == null) return saved;
+      return session.api.markPaid(
+        saved.id,
+        payment: payment,
         issueFiscal: _issueFiscal,
-      ),
-    );
+      );
+    });
     if (!mounted) return;
     setState(() => _busy = false);
-    if (order != null) widget.onDone(order);
+    if (order == null) return;
+    final n = orderNumber(order.number);
+    final change = payment?.receivedCents;
+    widget.onDone(
+      order,
+      payment == null
+          ? editing == null
+                ? 'Ordine $n salvato: lo trovi tra quelli da incassare'
+                : 'Ordine $n aggiornato'
+          : change == null
+          ? 'Ordine $n incassato'
+          : 'Ordine $n incassato · resto ${money(change - order.totalCents)}',
+    );
   }
 
   @override
@@ -146,8 +207,12 @@ class _NewOrderViewState extends State<NewOrderView> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               PageHeader(
-                title: 'Nuovo ordine',
-                subtitle: 'Per un cliente in cassa',
+                title: widget.editing == null
+                    ? 'Nuovo ordine'
+                    : 'Ordine ${orderNumber(widget.editing!.number)}',
+                subtitle: widget.editing == null
+                    ? 'Per un cliente in cassa'
+                    : 'Aggiungi o togli prodotti prima di incassare',
                 actions: [
                   OutlinedButton.icon(
                     key: const ValueKey('new-order-cancel'),
@@ -296,38 +361,37 @@ class _NewOrderViewState extends State<NewOrderView> {
                             title: const Text('Emetti documento fiscale'),
                           ),
                         const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FilledButton.icon(
-                                key: const ValueKey('new-order-cash'),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: S.success,
-                                  minimumSize: const Size.fromHeight(60),
-                                ),
-                                onPressed: _lines.isEmpty || _busy
-                                    ? null
-                                    : () => _pay('cash'),
-                                icon: const Icon(Icons.payments_rounded),
-                                label: const Text('Contanti'),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: FilledButton.icon(
-                                key: const ValueKey('new-order-card'),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: S.info,
-                                  minimumSize: const Size.fromHeight(60),
-                                ),
-                                onPressed: _lines.isEmpty || _busy
-                                    ? null
-                                    : () => _pay('card'),
-                                icon: const Icon(Icons.credit_card_rounded),
-                                label: const Text('Carta'),
-                              ),
-                            ),
-                          ],
+                        FilledButton.icon(
+                          key: const ValueKey('new-order-pay'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: S.success,
+                            minimumSize: const Size.fromHeight(60),
+                          ),
+                          onPressed: _lines.isEmpty || _busy
+                              ? null
+                              : () => _save(pay: true),
+                          icon: const Icon(Icons.point_of_sale_rounded),
+                          label: Text(
+                            widget.editing == null
+                                ? 'Incassa'
+                                : 'Salva e incassa',
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          key: const ValueKey('new-order-save'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(52),
+                          ),
+                          onPressed: _lines.isEmpty || _busy
+                              ? null
+                              : () => _save(pay: false),
+                          icon: const Icon(Icons.schedule_rounded),
+                          label: Text(
+                            widget.editing == null
+                                ? 'Salva, incassa dopo'
+                                : 'Salva modifiche',
+                          ),
                         ),
                       ],
                     ),

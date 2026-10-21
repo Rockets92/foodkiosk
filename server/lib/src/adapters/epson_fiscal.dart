@@ -146,16 +146,29 @@ class EpsonFiscalPrinter extends FiscalDevice {
         );
       }
     }
-    final method = order.payment?.provider ?? 'cash';
-    final paymentType =
-        paymentTypes[method] ??
-        (order.paymentMode == PaymentMode.kiosk ? 2 : 0);
-    b
-      ..write(
+    final pay = order.payment;
+    final totals = <(Cents, int)>[
+      if (pay?.cashCents case final cash? when pay?.cardCents != null) ...[
+        (pay!.receivedCents ?? cash, paymentTypes['cash'] ?? 0),
+        (pay.cardCents!, paymentTypes['card'] ?? 2),
+      ] else
+        (
+          // Cash handed over: the printer works out and prints the change.
+          pay?.provider == 'cash'
+              ? pay?.receivedCents ?? order.totalCents
+              : order.totalCents,
+          paymentTypes[pay?.provider ?? 'cash'] ??
+              (order.paymentMode == PaymentMode.kiosk ? 2 : 0),
+        ),
+    ];
+    for (final (i, (amount, paymentType)) in totals.indexed) {
+      b.write(
         '<printRecTotal operator="$operator" description="PAGAMENTO" '
-        'payment="${_amount(order.totalCents)}" paymentType="$paymentType" '
-        'index="1" justification="1" />',
-      )
+        'payment="${_amount(amount)}" paymentType="$paymentType" '
+        'index="${i + 1}" justification="1" />',
+      );
+    }
+    b
       ..write(
         '<printRecMessage operator="$operator" messageType="3" index="1" '
         'font="1" message="${_escape('ORDINE N. ${order.number}')}" />',

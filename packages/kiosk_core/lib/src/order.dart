@@ -169,6 +169,12 @@ class PaymentInfo {
   final String? message;
   final DateTime at;
 
+  /// At the till: the part paid in cash and by card (both set for a
+  /// `mixed` payment), and the cash handed over, to work out the change.
+  final Cents? cashCents;
+  final Cents? cardCents;
+  final Cents? receivedCents;
+
   const PaymentInfo({
     required this.provider,
     required this.at,
@@ -177,7 +183,15 @@ class PaymentInfo {
     this.cardBrand,
     this.maskedPan,
     this.message,
+    this.cashCents,
+    this.cardCents,
+    this.receivedCents,
   });
+
+  /// Change given back for the cash part.
+  Cents? get changeCents => receivedCents == null || cashCents == null
+      ? null
+      : receivedCents! - cashCents!;
 
   factory PaymentInfo.fromJson(Map<String, Object?> json) => PaymentInfo(
     provider: json['provider'] as String,
@@ -187,6 +201,9 @@ class PaymentInfo {
     cardBrand: json['cardBrand'] as String?,
     maskedPan: json['maskedPan'] as String?,
     message: json['message'] as String?,
+    cashCents: json['cashCents'] as int?,
+    cardCents: json['cardCents'] as int?,
+    receivedCents: json['receivedCents'] as int?,
   );
 
   Map<String, Object?> toJson() => {
@@ -197,6 +214,9 @@ class PaymentInfo {
     'cardBrand': cardBrand,
     'maskedPan': maskedPan,
     'message': message,
+    'cashCents': ?cashCents,
+    'cardCents': ?cardCents,
+    'receivedCents': ?receivedCents,
   };
 }
 
@@ -306,6 +326,8 @@ class Order {
   String get displayNumber => number.toString().padLeft(3, '0');
 
   Order copyWith({
+    ServiceMode? serviceMode,
+    List<OrderLine>? lines,
     OrderStatus? status,
     PaymentStatus? paymentStatus,
     KitchenStatus? kitchenStatus,
@@ -317,9 +339,9 @@ class Order {
     id: id,
     number: number,
     createdAt: createdAt,
-    serviceMode: serviceMode,
+    serviceMode: serviceMode ?? this.serviceMode,
     language: language,
-    lines: lines,
+    lines: lines ?? this.lines,
     paymentMode: paymentMode ?? this.paymentMode,
     status: status ?? this.status,
     paymentStatus: paymentStatus ?? this.paymentStatus,

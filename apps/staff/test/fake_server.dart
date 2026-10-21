@@ -102,6 +102,34 @@ class FakeServer {
         : (jsonDecode(req.body) as Map).cast<String, Object?>();
     final segments = req.url.pathSegments;
 
+    PaymentInfo payment(String method) => PaymentInfo(
+      provider: method,
+      at: DateTime.now(),
+      cashCents: body['cashCents'] as int?,
+      cardCents: body['cardCents'] as int?,
+      receivedCents: body['receivedCents'] as int?,
+    );
+
+    List<OrderLine> price(OrderRequest request) => [
+      for (final l in request.lines)
+        OrderLine(
+          productId: l.productId,
+          name: menu.product(l.productId)!.name,
+          quantity: l.quantity,
+          unitPriceCents: menu.product(l.productId)!.priceCents,
+          vatRate: 10,
+          options: [
+            for (final id in l.optionIds)
+              OrderLineOption(
+                groupId: 'extras',
+                optionId: id,
+                name: tx(id),
+                priceDeltaCents: 100,
+              ),
+          ],
+        ),
+    ];
+
     Order update(String id, Order Function(Order) f) {
       final i = orders.indexWhere((o) => o.id == id);
       return orders[i] = f(orders[i]);
@@ -137,25 +165,7 @@ class FakeServer {
         });
       case ('POST', '/api/staff/orders'):
         final request = OrderRequest.fromJson(body);
-        final lines = [
-          for (final l in request.lines)
-            OrderLine(
-              productId: l.productId,
-              name: menu.product(l.productId)!.name,
-              quantity: l.quantity,
-              unitPriceCents: menu.product(l.productId)!.priceCents,
-              vatRate: 10,
-              options: [
-                for (final id in l.optionIds)
-                  OrderLineOption(
-                    groupId: 'extras',
-                    optionId: id,
-                    name: tx(id),
-                    priceDeltaCents: 100,
-                  ),
-              ],
-            ),
-        ];
+        final lines = price(request);
         final method = body['payment'] as String?;
         final order = Order(
           id: 'o${orders.length + 100}',
@@ -169,9 +179,7 @@ class FakeServer {
           paymentStatus: method == null
               ? PaymentStatus.awaitingCounter
               : PaymentStatus.paid,
-          payment: method == null
-              ? null
-              : PaymentInfo(provider: method, at: DateTime.now()),
+          payment: method == null ? null : payment(method),
         );
         orders.add(order);
         return _json(order.toJson(), 201);
@@ -222,6 +230,18 @@ class FakeServer {
         update(segments[3], (o) => o.copyWith(kitchenStatus: status)).toJson(),
       );
     }
+    if (req.method == 'PUT' && path.endsWith('/lines')) {
+      final request = OrderRequest.fromJson(body);
+      return _json(
+        update(
+          segments[3],
+          (o) => o.copyWith(
+            lines: price(request),
+            serviceMode: request.serviceMode,
+          ),
+        ).toJson(),
+      );
+    }
     if (req.method == 'POST' && path.endsWith('/mark-paid')) {
       return _json(
         update(
@@ -229,10 +249,7 @@ class FakeServer {
           (o) => o
               .copyWith(
                 paymentStatus: PaymentStatus.paid,
-                payment: PaymentInfo(
-                  provider: body['method'] as String,
-                  at: DateTime.now(),
-                ),
+                payment: payment(body['method'] as String),
               )
               .withEvent('paid', detail: body['method'] as String),
         ).toJson(),

@@ -191,6 +191,9 @@ class Api {
           OrderRequest.fromJson(body),
           origin: OrderOrigin.counter,
           payMethod: method == null || method.isEmpty ? null : method,
+          cashCents: body['cashCents'] as int?,
+          cardCents: body['cardCents'] as int?,
+          receivedCents: body['receivedCents'] as int?,
           issueFiscal: body['issueFiscal'] as bool? ?? true,
         );
         return _ok(order.toJson(), status: 201);
@@ -210,8 +213,17 @@ class Api {
           (await orders.markPaid(
             id,
             method: body['method'] as String? ?? 'counter',
+            cashCents: body['cashCents'] as int?,
+            cardCents: body['cardCents'] as int?,
+            receivedCents: body['receivedCents'] as int?,
             issueFiscal: body['issueFiscal'] as bool? ?? true,
           )).toJson(),
+        );
+      })
+      ..put('/staff/orders/<id>/lines', (Request req, String id) async {
+        final body = await _body(req);
+        return _ok(
+          (await orders.editLines(id, OrderRequest.fromJson(body))).toJson(),
         );
       })
       ..post('/staff/orders/<id>/cancel', (Request req, String id) async {

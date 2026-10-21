@@ -555,6 +555,89 @@ void main() {
       expect(body['topProducts'][0]['quantity'], 2);
     });
 
+    test('till payments: change, mixed, and the cash/card split', () async {
+      final a = await placeOrder([burgerMeal()]);
+      final total = a['totalCents'] as int;
+      var (s, body) = await call(
+        'POST',
+        '/api/staff/orders/${a['id']}/mark-paid',
+        body: {'method': 'cash', 'receivedCents': total - 1},
+        staff: true,
+      );
+      expect(s, 400);
+      expect(body['error'], 'notEnoughCash');
+      (s, body) = await call(
+        'POST',
+        '/api/staff/orders/${a['id']}/mark-paid',
+        body: {'method': 'mixed', 'cashCents': 100, 'cardCents': 100},
+        staff: true,
+      );
+      expect(body['error'], 'invalidSplit');
+      (s, body) = await call(
+        'POST',
+        '/api/staff/orders/${a['id']}/mark-paid',
+        body: {
+          'method': 'mixed',
+          'cashCents': 500,
+          'cardCents': total - 500,
+          'receivedCents': 1000,
+        },
+        staff: true,
+      );
+      expect(s, 200, reason: '$body');
+      expect(body['payment']['cashCents'], 500);
+      expect(body['payment']['receivedCents'], 1000);
+
+      final (s2, b) = await call(
+        'POST',
+        '/api/staff/orders',
+        body: {
+          'lines': [burgerMeal()],
+          'payment': 'cash',
+          'receivedCents': 5000,
+        },
+        staff: true,
+      );
+      expect(s2, 201);
+      expect(b['payment']['cashCents'], total);
+
+      final (_, summary) = await call('GET', '/api/staff/summary', staff: true);
+      expect(summary['cashCents'], 500 + total);
+      expect(summary['cardCents'], total - 500);
+    });
+
+    test('items can be added to an unpaid order before the kitchen', () async {
+      await configure({'flow': FlowConfig.orderOnly.toJson()});
+      final a = await placeOrder([burgerMeal()]);
+      final (s, edited) = await call(
+        'PUT',
+        '/api/staff/orders/${a['id']}/lines',
+        body: {
+          'serviceMode': 'takeAway',
+          'lines': [
+            burgerMeal(),
+            {'productId': 'water'},
+          ],
+        },
+        staff: true,
+      );
+      expect(s, 200, reason: '$edited');
+      expect(edited['lines'], hasLength(2));
+      expect(edited['serviceMode'], 'takeAway');
+      expect(edited['totalCents'], greaterThan(a['totalCents'] as int));
+
+      await call('POST', '/api/staff/orders/${a['id']}/mark-paid', staff: true);
+      final (s2, _) = await call(
+        'PUT',
+        '/api/staff/orders/${a['id']}/lines',
+        body: {
+          'lines': [burgerMeal()],
+        },
+        staff: true,
+      );
+      expect(s2, 409, reason: 'paid orders are final');
+    });
+
     test('photos are uploaded to the media folder', () async {
       final dir = Directory.systemTemp.createTempSync('media');
       addTearDown(() => dir.deleteSync(recursive: true));
@@ -606,7 +689,7 @@ void main() {
     });
     tearDown(() => device.close(force: true));
 
-    Order paidOrder() => Order(
+    Order paidOrder([PaymentInfo? payment]) => Order(
       id: 'o1',
       number: 7,
       createdAt: DateTime(2026, 10, 19),
@@ -616,7 +699,8 @@ void main() {
       status: OrderStatus.open,
       paymentStatus: PaymentStatus.paid,
       kitchenStatus: KitchenStatus.none,
-      payment: PaymentInfo(provider: 'card', at: DateTime(2026, 10, 19)),
+      payment:
+          payment ?? PaymentInfo(provider: 'card', at: DateTime(2026, 10, 19)),
       lines: const [
         OrderLine(
           productId: 'b',
@@ -660,6 +744,25 @@ void main() {
       );
       expect(sent, contains('unitPrice="1,00"'));
       expect(sent, contains('payment="15,00" paymentType="2"'));
+    });
+
+    test('a mixed payment is sent as two totals', () async {
+      reply = '<response success="true" code="" status="2"/>';
+      final rt = EpsonFiscalPrinter(host: '127.0.0.1', port: device.port);
+      await rt.issue(
+        paidOrder(
+          PaymentInfo(
+            provider: 'mixed',
+            at: DateTime(2026, 10, 19),
+            cashCents: 500,
+            cardCents: 1000,
+            receivedCents: 2000,
+          ),
+        ),
+      );
+      final sent = received.single;
+      expect(sent, contains('payment="20,00" paymentType="0" index="1"'));
+      expect(sent, contains('payment="10,00" paymentType="2" index="2"'));
     });
 
     test('a refused receipt is an error', () async {
