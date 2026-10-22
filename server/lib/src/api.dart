@@ -11,6 +11,7 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf_web_socket/shelf_web_socket.dart';
 
 import 'adapters/registry.dart';
+import 'discount_service.dart';
 import 'errors.dart';
 import 'event_bus.dart';
 import 'menu_service.dart';
@@ -69,6 +70,7 @@ class Api {
   /// Folder where uploaded photos are stored and served from `/media/`.
   final String? mediaDir;
   final OrderService orders;
+  final DiscountService discounts;
   final PrintJobRepository printJobs;
   final AdapterRegistry registry;
   final EventBus bus;
@@ -81,6 +83,7 @@ class Api {
     required this.settings,
     required this.menu,
     required this.orders,
+    required this.discounts,
     required this.printJobs,
     required this.registry,
     required this.bus,
@@ -128,6 +131,15 @@ class Api {
           ],
         }),
       )
+      ..post('/discounts/check', (Request req) async {
+        final body = await _body(req);
+        final code = discounts.lookup(
+          body['code'] as String? ?? '',
+          channel: DiscountChannel.kiosk,
+          client: _clientOf(req),
+        );
+        return _ok(code.toPublicJson());
+      })
       ..post('/orders', (Request req) async {
         final body = await _body(req);
         final order = await orders.create(OrderRequest.fromJson(body));
@@ -202,6 +214,42 @@ class Api {
         );
       })
       ..get('/staff/orders', _listOrders)
+      ..post('/staff/discounts/check', (Request req) async {
+        final body = await _body(req);
+        return _ok(
+          discounts
+              .lookup(
+                body['code'] as String? ?? '',
+                channel: DiscountChannel.counter,
+                client: 'staff',
+              )
+              .toPublicJson(),
+        );
+      })
+      ..get(
+        '/admin/discounts',
+        (Request _) => _ok({
+          'codes': [for (final c in discounts.all()) c.toJson()],
+        }),
+      )
+      ..post(
+        '/admin/discounts',
+        (Request req) async =>
+            _ok(discounts.save(await _body(req)).toJson(), status: 201),
+      )
+      ..put(
+        '/admin/discounts/<id>',
+        (Request req, String id) async =>
+            _ok(discounts.save(await _body(req), id: id).toJson()),
+      )
+      ..post(
+        '/admin/discounts/<id>/reset-uses',
+        (Request _, String id) => _ok(discounts.resetUses(id).toJson()),
+      )
+      ..delete('/admin/discounts/<id>', (Request _, String id) {
+        discounts.delete(id);
+        return Response(204);
+      })
       ..post('/staff/orders', (Request req) async {
         final body = await _body(req);
         final method = body['payment'] as String?;
@@ -412,6 +460,11 @@ class Api {
           o.toJson(),
       ],
     });
+  }
+
+  static String _clientOf(Request req) {
+    final info = req.context['shelf.io.connection_info'];
+    return info is HttpConnectionInfo ? info.remoteAddress.address : '';
   }
 
   FutureOr<Response> _webSocket(Request req) {

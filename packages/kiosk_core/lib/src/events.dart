@@ -5,6 +5,7 @@ class ServerEvent {
   static const orderUpdated = 'order.updated';
   static const menuUpdated = 'menu.updated';
   static const settingsUpdated = 'settings.updated';
+  static const discountsUpdated = 'discounts.updated';
   static const printJob = 'print.job';
   static const pickupAnnounce = 'pickup.announce';
 

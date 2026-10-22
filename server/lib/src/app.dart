@@ -4,6 +4,7 @@ import 'adapters/registry.dart';
 import 'api.dart';
 import 'database.dart';
 import 'demo_data.dart';
+import 'discount_service.dart';
 import 'event_bus.dart';
 import 'menu_service.dart';
 import 'order_service.dart';
@@ -18,6 +19,7 @@ class KioskApp {
   final SettingsService settings;
   final MenuService menu;
   final OrderService orders;
+  final DiscountService discounts;
   final PrintJobRepository printJobs;
   final Handler handler;
 
@@ -28,6 +30,7 @@ class KioskApp {
     this.settings,
     this.menu,
     this.orders,
+    this.discounts,
     this.printJobs,
     this.handler,
   );
@@ -46,8 +49,19 @@ class KioskApp {
     final printJobs = PrintJobRepository(db);
     final settings = SettingsService(SettingsRepository(db), reg, bus)
       ..ensureInitialized();
-    if (seedDemo && menuRepo.isEmpty) seedDemoMenu(menuRepo);
+    final discountRepo = DiscountRepository(db);
+    if (seedDemo && menuRepo.isEmpty) {
+      seedDemoMenu(menuRepo);
+      if (discountRepo.isEmpty) seedDemoDiscounts(discountRepo);
+    }
     final menu = MenuService(menuRepo, bus);
+    final discounts = DiscountService(
+      discountRepo,
+      menuRepo,
+      settings,
+      bus,
+      clock: clock,
+    );
     final orders = OrderService(
       db,
       menuRepo,
@@ -55,12 +69,14 @@ class KioskApp {
       printJobs,
       settings,
       bus,
+      discounts,
       clock: clock,
     );
     final api = Api(
       settings: settings,
       menu: menu,
       orders: orders,
+      discounts: discounts,
       printJobs: printJobs,
       registry: reg,
       bus: bus,
@@ -74,6 +90,7 @@ class KioskApp {
       settings,
       menu,
       orders,
+      discounts,
       printJobs,
       api.handler,
     );

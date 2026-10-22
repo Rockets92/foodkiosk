@@ -67,6 +67,14 @@ class AppDatabase {
       error TEXT
     );
     ''',
+    '''
+    CREATE TABLE discount_codes (
+      id TEXT PRIMARY KEY,
+      code TEXT NOT NULL UNIQUE,
+      used_count INTEGER NOT NULL DEFAULT 0,
+      data TEXT NOT NULL
+    );
+    ''',
   ];
 
   int get schemaVersion =>

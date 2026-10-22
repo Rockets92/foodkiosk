@@ -2,6 +2,7 @@ import 'package:kiosk_core/kiosk_core.dart';
 
 import 'adapters/printer.dart';
 import 'database.dart';
+import 'discount_service.dart';
 import 'errors.dart';
 import 'event_bus.dart';
 import 'ids.dart';
@@ -22,6 +23,7 @@ class OrderService {
   final PrintJobRepository _printJobs;
   final SettingsService _settings;
   final EventBus _bus;
+  final DiscountService _discounts;
   final DateTime Function() _clock;
 
   /// Orders with a kiosk payment in flight, to refuse double charges.
@@ -33,7 +35,8 @@ class OrderService {
     this._orders,
     this._printJobs,
     this._settings,
-    this._bus, {
+    this._bus,
+    this._discounts, {
     DateTime Function()? clock,
   }) : _clock = clock ?? DateTime.now;
 
@@ -102,10 +105,18 @@ class OrderService {
     final lines = [
       for (final l in req.lines) _priceLine(menu, l, req.serviceMode),
     ];
+    final (code, discount) = _discountFor(
+      req.discountCode,
+      lines,
+      origin == OrderOrigin.counter
+          ? DiscountChannel.counter
+          : DiscountChannel.kiosk,
+    );
     final payment = payMethod == null
         ? null
         : _counterPayment(
-            lines.fold(0, (sum, l) => sum + l.totalCents),
+            lines.fold(0, (sum, l) => sum + l.totalCents) -
+                (discount?.amountCents ?? 0),
             method: payMethod,
             cashCents: cashCents,
             cardCents: cardCents,
@@ -115,6 +126,7 @@ class OrderService {
     final order = _db.transaction(() {
       final now = _clock();
       if (s.enforcesStock) _takeStock(lines);
+      if (code != null) _discounts.claim(code);
       final order =
           Order(
             id: newId(),
@@ -131,6 +143,7 @@ class OrderService {
             },
             isDemo: s.demoMode,
             origin: origin,
+            discount: discount,
           ).withEvent(
             origin == OrderOrigin.counter ? 'createdAtCounter' : 'created',
             at: now,
@@ -159,6 +172,18 @@ class OrderService {
       },
     );
     return _complete(paid);
+  }
+
+  /// The code entered with the order and what it takes off [lines];
+  /// (null, null) without a code.
+  (DiscountCode?, OrderDiscount?) _discountFor(
+    String? raw,
+    List<OrderLine> lines,
+    DiscountChannel channel,
+  ) {
+    if (raw == null || raw.trim().isEmpty) return (null, null);
+    final code = _discounts.lookup(raw, channel: channel);
+    return (code, _discounts.apply(code, lines));
   }
 
   OrderLine _priceLine(Menu menu, OrderRequestLine req, ServiceMode mode) {
@@ -474,17 +499,63 @@ class OrderService {
     final mode = req.serviceMode;
     final menu = _menu.loadForKiosk();
     final lines = [for (final l in req.lines) _priceLine(menu, l, mode)];
+    final previous = order.discount;
+    final raw = req.discountCode == null
+        ? null
+        : DiscountCode.normalize(req.discountCode!);
+    // The code already on the order keeps its use even if it has since
+    // run out or been disabled; only its amount follows the new items.
+    final DiscountCode? code;
+    final OrderDiscount? discount;
+    if (raw == null || raw.isEmpty) {
+      (code, discount) = (null, null);
+    } else if (previous != null && previous.code == raw) {
+      final kept = _discounts.repository.byId(previous.codeId);
+      code = null;
+      discount = kept == null
+          ? _reprice(previous, lines)
+          : OrderDiscount.of(kept, _discounts.apply(kept, lines).amountCents);
+    } else {
+      (code, discount) = _discountFor(raw, lines, DiscountChannel.counter);
+    }
     order = _db.transaction(() {
       _returnStock(order);
       if (_s.enforcesStock) _takeStock(lines);
+      final codeChanged = previous?.code != discount?.code;
+      if (codeChanged && previous != null) {
+        _discounts.release(previous.codeId);
+      }
+      if (code != null) _discounts.claim(code);
       final edited = order
           .copyWith(serviceMode: mode, lines: lines)
-          .withEvent('edited', at: _clock());
+          .withDiscount(discount)
+          .withEvent(
+            'edited',
+            at: _clock(),
+            detail: !codeChanged
+                ? null
+                : discount == null
+                ? 'discountRemoved'
+                : 'discount:${discount.code}',
+          );
       _orders.update(edited);
       return edited;
     });
     _bus.emit(ServerEvent.orderUpdated, order.toJson());
     return order;
+  }
+
+  /// A discount whose code was deleted: same kind, recomputed by hand.
+  OrderDiscount _reprice(OrderDiscount d, List<OrderLine> lines) {
+    final code = DiscountCode(
+      id: d.codeId,
+      code: d.code,
+      type: d.type,
+      percent: d.percent,
+      productId: d.productId,
+      amountCents: d.type == DiscountType.amount ? d.amountCents : 0,
+    );
+    return _discounts.apply(code, lines);
   }
 
   // ---------------------------------------------------------------------
@@ -549,6 +620,15 @@ class OrderService {
         o.payment?.cashCents ??
         (o.payment?.provider == 'cash' ? o.totalCents : 0);
     final cash = paid.fold(0, (s, o) => s + cashOf(o));
+    final discounted = paid.where((o) => o.discount != null);
+    final codes = <String, ({int uses, int cents})>{};
+    for (final o in discounted) {
+      final prev = codes[o.discount!.code];
+      codes[o.discount!.code] = (
+        uses: (prev?.uses ?? 0) + 1,
+        cents: (prev?.cents ?? 0) + o.discountCents,
+      );
+    }
     final products = <String, ({String name, int qty, int cents})>{};
     final byHour = List.filled(24, 0);
     for (final o in valid) {
@@ -574,6 +654,12 @@ class OrderService {
       'paidOrders': paid.length,
       'revenueCents': revenue,
       'averageCents': paid.isEmpty ? 0 : (revenue / paid.length).round(),
+      'discountCents': discounted.fold<int>(0, (s, o) => s + o.discountCents),
+      'discountedOrders': discounted.length,
+      'discountCodes': [
+        for (final e in codes.entries)
+          {'code': e.key, 'uses': e.value.uses, 'totalCents': e.value.cents},
+      ],
       'awaitingCounter': valid
           .where((o) => o.paymentStatus == PaymentStatus.awaitingCounter)
           .length,
@@ -623,7 +709,11 @@ class OrderService {
           ),
     );
     if (paid) order = _save(order.withEvent('refundRequired'));
-    _db.transaction(() => _returnStock(order));
+    final discount = order.discount;
+    _db.transaction(() {
+      _returnStock(order);
+      if (discount != null) _discounts.release(discount.codeId);
+    });
     return order;
   }
 
