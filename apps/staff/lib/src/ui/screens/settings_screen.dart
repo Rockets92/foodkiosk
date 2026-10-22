@@ -9,6 +9,7 @@ import '../../session.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'settings/devices_section.dart';
+import 'settings/discounts_section.dart';
 import 'settings/flow_section.dart';
 import 'settings/general_sections.dart';
 import 'settings/network_section.dart';
@@ -27,6 +28,7 @@ enum _Part {
   demo('Modalità demo', Icons.science_rounded),
   general('Generale', Icons.storefront_rounded),
   flow('Flusso ordine', Icons.alt_route_rounded),
+  discounts('Codici sconto', Icons.local_offer_rounded),
   devices('Dispositivi', Icons.devices_other_rounded),
   network('Rete', Icons.lan_rounded),
   security('Sicurezza', Icons.lock_rounded);
@@ -237,6 +239,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         counterFallback: s.counterFallback,
         onChanged: (f) => _set('flow', f.toJson()),
         onCounterFallback: (v) => _set('counterFallback', v),
+      ),
+      _Part.discounts: DiscountsSection(
+        value: s.discounts,
+        onChanged: (d) => _set('discounts', d.toJson()),
       ),
       _Part.devices: DevicesSection(
         s: s,

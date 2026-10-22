@@ -7,6 +7,7 @@ import '../../session.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/payment_dialog.dart';
+import '../widgets/scanner_listener.dart';
 
 /// One line of the cashier's cart, priced from the menu for display (the
 /// server prices it again).
@@ -51,12 +52,34 @@ class _NewOrderViewState extends State<NewOrderView> {
   bool _issueFiscal = true;
   bool _busy = false;
 
+  /// The discount code the customer gave, priced again on every change.
+  DiscountCode? _coupon;
+  bool _checking = false;
+  final _code = TextEditingController();
+
+  @override
+  void dispose() {
+    _code.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
     final order = widget.editing;
     if (order == null) return;
     _mode = order.serviceMode;
+    if (order.discount case final d?) {
+      _coupon = DiscountCode(
+        id: d.codeId,
+        code: d.code,
+        type: d.type,
+        label: d.label,
+        percent: d.percent,
+        productId: d.productId,
+        amountCents: d.type == DiscountType.amount ? d.amountCents : 0,
+      );
+    }
     final menu = context.staffRead.menu;
     for (final l in order.lines) {
       final product = menu.product(l.productId);
@@ -79,7 +102,41 @@ class _NewOrderViewState extends State<NewOrderView> {
     return _mode != null && modes.contains(_mode) ? _mode! : modes.first;
   }
 
-  Cents get _total => _lines.fold(0, (s, l) => s + l.unitCents * l.quantity);
+  Cents get _subtotal => _lines.fold(0, (s, l) => s + l.unitCents * l.quantity);
+
+  DiscountResult? get _discount => _coupon?.evaluate([
+    for (final l in _lines)
+      (
+        productId: l.product.id,
+        quantity: l.quantity,
+        unitBaseCents: l.product.priceCents,
+        totalCents: l.unitCents * l.quantity,
+      ),
+  ]);
+
+  Cents get _discountCents {
+    final d = _discount;
+    return d != null && d.ok ? d.amountCents : 0;
+  }
+
+  Cents get _total => _subtotal - _discountCents;
+
+  Future<void> _applyCode(String raw) async {
+    final code = DiscountCode.normalize(raw);
+    if (code.isEmpty || _checking) return;
+    final api = context.staffRead.api;
+    setState(() => _checking = true);
+    final found = await guard(context, () => api.checkDiscount(code));
+    if (!mounted) return;
+    setState(() {
+      _checking = false;
+      if (found != null) {
+        _coupon = found;
+        _code.clear();
+      }
+    });
+    if (found != null) showMessage(context, 'Codice ${found.code} applicato');
+  }
 
   List<Category> _categories(Menu menu, ServiceMode mode) => [
     for (final c in [
@@ -131,6 +188,7 @@ class _NewOrderViewState extends State<NewOrderView> {
           optionIds: [for (final o in l.options) o.id],
         ),
     ],
+    discountCode: _discount?.ok ?? false ? _coupon!.code : null,
   );
 
   /// Saves the order and, with [pay], asks for the payment and cashes it.
@@ -197,211 +255,248 @@ class _NewOrderViewState extends State<NewOrderView> {
     final fiscalOnPayment = settings.flow
         .actionsFor(FlowEvent.paid)
         .contains(FlowAction.issueFiscalDocument);
+    final codes = settings.discounts.onCounter;
 
-    return Row(
-      key: const ValueKey('new-order'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              PageHeader(
-                title: widget.editing == null
-                    ? 'Nuovo ordine'
-                    : 'Ordine ${orderNumber(widget.editing!.number)}',
-                subtitle: widget.editing == null
-                    ? 'Per un cliente in cassa'
-                    : 'Aggiungi o togli prodotti prima di incassare',
-                actions: [
-                  OutlinedButton.icon(
-                    key: const ValueKey('new-order-cancel'),
-                    onPressed: _busy ? null : widget.onCancel,
-                    icon: const Icon(Icons.arrow_back_rounded),
-                    label: const Text('Torna agli ordini'),
+    return ScannerListener(
+      enabled: codes && !_busy,
+      onScan: _applyCode,
+      child: Row(
+        key: const ValueKey('new-order'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                PageHeader(
+                  title: widget.editing == null
+                      ? 'Nuovo ordine'
+                      : 'Ordine ${orderNumber(widget.editing!.number)}',
+                  subtitle: widget.editing == null
+                      ? 'Per un cliente in cassa'
+                      : 'Aggiungi o togli prodotti prima di incassare',
+                  actions: [
+                    OutlinedButton.icon(
+                      key: const ValueKey('new-order-cancel'),
+                      onPressed: _busy ? null : widget.onCancel,
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      label: const Text('Torna agli ordini'),
+                    ),
+                  ],
+                ),
+                SizedBox(
+                  height: 48,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    children: [
+                      for (final c in categories)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            key: ValueKey('new-order-cat-${c.id}'),
+                            label: Text(c.name.resolve('it')),
+                            selected: c.id == category?.id,
+                            onSelected: (_) =>
+                                setState(() => _categoryId = c.id),
+                          ),
+                        ),
+                    ],
                   ),
-                ],
-              ),
-              SizedBox(
-                height: 48,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: products.isEmpty
+                      ? const EmptyState(
+                          icon: Icons.restaurant_menu_rounded,
+                          title: 'Nessun prodotto',
+                          message: 'Aggiungi prodotti dalla sezione Menu.',
+                        )
+                      : GridView.builder(
+                          padding: const EdgeInsets.fromLTRB(28, 8, 28, 24),
+                          gridDelegate:
+                              const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 200,
+                                mainAxisExtent: 196,
+                                mainAxisSpacing: 12,
+                                crossAxisSpacing: 12,
+                              ),
+                          itemCount: products.length,
+                          itemBuilder: (_, i) =>
+                              _ProductTile(
+                                product: products[i],
+                                onTap: products[i].soldOut
+                                    ? null
+                                    : () => _add(products[i]),
+                              ).animate().fadeIn(
+                                duration: 220.ms,
+                                delay: (15 * i.clamp(0, 12)).ms,
+                              ),
+                        ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            width: 400,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(0, 24, 24, 24),
+              child: Panel(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (final c in categories)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                      child: Text('Ordine', style: ST.h2),
+                    ),
+                    if (modes.length > 1)
                       Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          key: ValueKey('new-order-cat-${c.id}'),
-                          label: Text(c.name.resolve('it')),
-                          selected: c.id == category?.id,
-                          onSelected: (_) => setState(() => _categoryId = c.id),
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: SegmentedButton<ServiceMode>(
+                          key: const ValueKey('new-order-mode'),
+                          segments: [
+                            for (final m in modes)
+                              ButtonSegment(
+                                value: m,
+                                label: Text(serviceModeLabel(m)),
+                              ),
+                          ],
+                          selected: {mode},
+                          onSelectionChanged: (s) =>
+                              setState(() => _mode = s.first),
                         ),
                       ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: _lines.isEmpty
+                          ? const EmptyState(
+                              icon: Icons.add_shopping_cart_rounded,
+                              title: 'Ordine vuoto',
+                              message: 'Tocca i prodotti per aggiungerli.',
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 8,
+                              ),
+                              itemCount: _lines.length,
+                              separatorBuilder: (_, _) => const Divider(),
+                              itemBuilder: (_, i) => _CartLine(
+                                key: ValueKey('new-order-line-$i'),
+                                line: _lines[i],
+                                money: session.money,
+                                onMinus: () => setState(() {
+                                  if (--_lines[i].quantity == 0) {
+                                    _lines.removeAt(i);
+                                  }
+                                }),
+                                onPlus: () => setState(() {
+                                  if (_lines[i].quantity <
+                                      settings.maxQuantityPerLine) {
+                                    _lines[i].quantity++;
+                                  }
+                                }),
+                              ),
+                            ),
+                    ),
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (codes || _coupon != null) ...[
+                            _CouponBox(
+                              coupon: _coupon,
+                              result: _discount,
+                              controller: _code,
+                              checking: _checking,
+                              money: session.money,
+                              productName: _coupon?.productId == null
+                                  ? null
+                                  : session.menu
+                                        .product(_coupon!.productId!)
+                                        ?.name
+                                        .resolve('it'),
+                              onApply: () => _applyCode(_code.text),
+                              onRemove: () => setState(() => _coupon = null),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          if (_discountCents > 0) ...[
+                            _SmallRow('Subtotale', session.money(_subtotal)),
+                            _SmallRow(
+                              'Sconto ${_coupon!.code}',
+                              '-${session.money(_discountCents)}',
+                              key: const ValueKey('new-order-discount'),
+                              color: S.success,
+                            ),
+                            const SizedBox(height: 4),
+                          ],
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text('Totale', style: ST.h2),
+                              ),
+                              Text(
+                                session.money(_total),
+                                key: const ValueKey('new-order-total'),
+                                style: ST.h1,
+                              ),
+                            ],
+                          ),
+                          if (fiscalOnPayment)
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              value: _issueFiscal,
+                              onChanged: (v) =>
+                                  setState(() => _issueFiscal = v),
+                              title: const Text('Emetti documento fiscale'),
+                            ),
+                          const SizedBox(height: 12),
+                          FilledButton.icon(
+                            key: const ValueKey('new-order-pay'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: S.success,
+                              minimumSize: const Size.fromHeight(60),
+                            ),
+                            onPressed: _lines.isEmpty || _busy
+                                ? null
+                                : () => _save(pay: true),
+                            icon: const Icon(Icons.point_of_sale_rounded),
+                            label: Text(
+                              widget.editing == null
+                                  ? 'Incassa'
+                                  : 'Salva e incassa',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            key: const ValueKey('new-order-save'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(52),
+                            ),
+                            onPressed: _lines.isEmpty || _busy
+                                ? null
+                                : () => _save(pay: false),
+                            icon: const Icon(Icons.schedule_rounded),
+                            label: Text(
+                              widget.editing == null
+                                  ? 'Salva, incassa dopo'
+                                  : 'Salva modifiche',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: products.isEmpty
-                    ? const EmptyState(
-                        icon: Icons.restaurant_menu_rounded,
-                        title: 'Nessun prodotto',
-                        message: 'Aggiungi prodotti dalla sezione Menu.',
-                      )
-                    : GridView.builder(
-                        padding: const EdgeInsets.fromLTRB(28, 8, 28, 24),
-                        gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 200,
-                              mainAxisExtent: 196,
-                              mainAxisSpacing: 12,
-                              crossAxisSpacing: 12,
-                            ),
-                        itemCount: products.length,
-                        itemBuilder: (_, i) =>
-                            _ProductTile(
-                              product: products[i],
-                              onTap: products[i].soldOut
-                                  ? null
-                                  : () => _add(products[i]),
-                            ).animate().fadeIn(
-                              duration: 220.ms,
-                              delay: (15 * i.clamp(0, 12)).ms,
-                            ),
-                      ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(
-          width: 400,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(0, 24, 24, 24),
-            child: Panel(
-              padding: EdgeInsets.zero,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-                    child: Text('Ordine', style: ST.h2),
-                  ),
-                  if (modes.length > 1)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: SegmentedButton<ServiceMode>(
-                        key: const ValueKey('new-order-mode'),
-                        segments: [
-                          for (final m in modes)
-                            ButtonSegment(
-                              value: m,
-                              label: Text(serviceModeLabel(m)),
-                            ),
-                        ],
-                        selected: {mode},
-                        onSelectionChanged: (s) =>
-                            setState(() => _mode = s.first),
-                      ),
-                    ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: _lines.isEmpty
-                        ? const EmptyState(
-                            icon: Icons.add_shopping_cart_rounded,
-                            title: 'Ordine vuoto',
-                            message: 'Tocca i prodotti per aggiungerli.',
-                          )
-                        : ListView.separated(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 8,
-                            ),
-                            itemCount: _lines.length,
-                            separatorBuilder: (_, _) => const Divider(),
-                            itemBuilder: (_, i) => _CartLine(
-                              key: ValueKey('new-order-line-$i'),
-                              line: _lines[i],
-                              money: session.money,
-                              onMinus: () => setState(() {
-                                if (--_lines[i].quantity == 0) {
-                                  _lines.removeAt(i);
-                                }
-                              }),
-                              onPlus: () => setState(() {
-                                if (_lines[i].quantity <
-                                    settings.maxQuantityPerLine) {
-                                  _lines[i].quantity++;
-                                }
-                              }),
-                            ),
-                          ),
-                  ),
-                  const Divider(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          children: [
-                            const Expanded(child: Text('Totale', style: ST.h2)),
-                            Text(
-                              session.money(_total),
-                              key: const ValueKey('new-order-total'),
-                              style: ST.h1,
-                            ),
-                          ],
-                        ),
-                        if (fiscalOnPayment)
-                          SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            value: _issueFiscal,
-                            onChanged: (v) => setState(() => _issueFiscal = v),
-                            title: const Text('Emetti documento fiscale'),
-                          ),
-                        const SizedBox(height: 12),
-                        FilledButton.icon(
-                          key: const ValueKey('new-order-pay'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: S.success,
-                            minimumSize: const Size.fromHeight(60),
-                          ),
-                          onPressed: _lines.isEmpty || _busy
-                              ? null
-                              : () => _save(pay: true),
-                          icon: const Icon(Icons.point_of_sale_rounded),
-                          label: Text(
-                            widget.editing == null
-                                ? 'Incassa'
-                                : 'Salva e incassa',
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        OutlinedButton.icon(
-                          key: const ValueKey('new-order-save'),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(52),
-                          ),
-                          onPressed: _lines.isEmpty || _busy
-                              ? null
-                              : () => _save(pay: false),
-                          icon: const Icon(Icons.schedule_rounded),
-                          label: Text(
-                            widget.editing == null
-                                ? 'Salva, incassa dopo'
-                                : 'Salva modifiche',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -619,5 +714,140 @@ class _OptionsDialogState extends State<_OptionsDialog> {
         ),
       ],
     );
+  }
+}
+
+class _SmallRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _SmallRow(this.label, this.value, {super.key, this.color = S.inkSoft});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 2),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(label, style: ST.body.copyWith(color: color)),
+        ),
+        Text(
+          value,
+          style: ST.body.copyWith(color: color, fontWeight: FontWeight.w700),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Discount code at the till: a field (typed, or filled by a reader) and,
+/// once applied, the code with what it takes off.
+class _CouponBox extends StatelessWidget {
+  final DiscountCode? coupon;
+  final DiscountResult? result;
+  final TextEditingController controller;
+  final bool checking;
+  final String Function(Cents) money;
+  final String? productName;
+  final VoidCallback onApply;
+  final VoidCallback onRemove;
+
+  const _CouponBox({
+    required this.coupon,
+    required this.result,
+    required this.controller,
+    required this.checking,
+    required this.money,
+    required this.productName,
+    required this.onApply,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = coupon;
+    if (c == null) {
+      return Row(
+        children: [
+          Expanded(
+            child: TextField(
+              key: const ValueKey('new-order-code'),
+              controller: controller,
+              textCapitalization: TextCapitalization.characters,
+              onSubmitted: (_) => onApply(),
+              decoration: const InputDecoration(
+                isDense: true,
+                hintText: 'Codice sconto',
+                prefixIcon: Icon(Icons.local_offer_outlined),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            key: const ValueKey('new-order-code-apply'),
+            onPressed: checking ? null : onApply,
+            child: checking
+                ? const SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Applica'),
+          ),
+        ],
+      );
+    }
+    final ok = result?.ok ?? false;
+    final color = ok ? S.success : S.warning;
+    final what = switch (c.type) {
+      DiscountType.percent => 'Sconto ${c.percent}%',
+      DiscountType.amount => 'Sconto ${money(c.amountCents)}',
+      DiscountType.freeProduct => '${productName ?? 'Prodotto'} in omaggio',
+    };
+    final problem = switch (result?.problem) {
+      'minOrderNotReached' =>
+        'Serve una spesa di almeno ${money(c.minOrderCents)}',
+      'freeProductMissing' =>
+        'Aggiungi ${productName ?? 'il prodotto'} all\'ordine',
+      _ => null,
+    };
+    return Container(
+      key: const ValueKey('new-order-coupon'),
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            ok ? Icons.local_offer_rounded : Icons.info_outline_rounded,
+            color: color,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  c.code,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                Text(problem ?? what, style: ST.small),
+              ],
+            ),
+          ),
+          IconButton(
+            key: const ValueKey('new-order-code-remove'),
+            tooltip: 'Togli il codice',
+            onPressed: onRemove,
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
+      ),
+    ).animate().fadeIn().scaleXY(begin: 0.95, curve: Curves.easeOutBack);
   }
 }

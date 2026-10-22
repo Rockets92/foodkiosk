@@ -18,6 +18,7 @@ dependencies:
   kiosk_core:
     path: ../../packages/kiosk_core
   flutter_svg: ^2.3.0
+  barcode_widget: ^2.0.4
 
 dev_dependencies:
   flutter_test:

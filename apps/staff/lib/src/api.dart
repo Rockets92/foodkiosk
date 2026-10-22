@@ -212,6 +212,41 @@ class StaffApi {
     return (json as Map)['url'] as String;
   }
 
+  // Discount codes ---------------------------------------------------------
+
+  Future<List<DiscountCode>> discounts() async {
+    final json = await _map('GET', '/api/admin/discounts');
+    return [
+      for (final c in json['codes'] as List? ?? const [])
+        DiscountCode.fromJson((c as Map).cast()),
+    ];
+  }
+
+  Future<DiscountCode> saveDiscount(
+    DiscountCode c, {
+    bool isNew = false,
+  }) async => DiscountCode.fromJson(
+    await _map(
+      isNew ? 'POST' : 'PUT',
+      isNew ? '/api/admin/discounts' : '/api/admin/discounts/${c.id}',
+      body: c.toJson(),
+    ),
+  );
+
+  Future<void> deleteDiscount(String id) =>
+      send('DELETE', '/api/admin/discounts/$id');
+
+  Future<DiscountCode> resetDiscountUses(String id) async =>
+      DiscountCode.fromJson(
+        await _map('POST', '/api/admin/discounts/$id/reset-uses'),
+      );
+
+  /// Looks up a code the customer gives at the till.
+  Future<DiscountCode> checkDiscount(String code) async =>
+      DiscountCode.fromJson(
+        await _map('POST', '/api/staff/discounts/check', body: {'code': code}),
+      );
+
   // Orders -----------------------------------------------------------------
 
   Future<List<Order>> orders({String? day}) async {

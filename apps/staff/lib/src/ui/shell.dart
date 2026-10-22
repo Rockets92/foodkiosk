@@ -3,6 +3,7 @@ import 'package:kiosk_core/kiosk_core.dart';
 
 import '../session.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/discounts_screen.dart';
 import 'screens/kitchen_screen.dart';
 import 'screens/menu_screen.dart';
 import 'screens/orders_screen.dart';
@@ -17,6 +18,7 @@ enum Section {
   kitchen('Cucina', Icons.soup_kitchen_rounded),
   pickup('Ritiro', Icons.tv_rounded),
   menu('Menu', Icons.restaurant_menu_rounded),
+  discounts('Sconti', Icons.local_offer_rounded),
   settings('Impostazioni', Icons.tune_rounded);
 
   final String label;
@@ -24,12 +26,15 @@ enum Section {
   const Section(this.label, this.icon);
 
   /// Kitchen and pickup screens only appear when the order flow uses them
-  /// (e.g. not with "Solo ordine", where another system runs the kitchen).
-  bool usedBy(FlowConfig flow) {
+  /// (e.g. not with "Solo ordine", where another system runs the kitchen),
+  /// discount codes when they are switched on.
+  bool usedBy(KioskSettings settings) {
+    final flow = settings.flow;
     bool uses(FlowAction a) => flow.rules.values.any((l) => l.contains(a));
     return switch (this) {
       Section.kitchen => uses(FlowAction.sendToKitchenDisplay),
       Section.pickup => uses(FlowAction.announceOnPickupScreen),
+      Section.discounts => settings.discounts.enabled,
       _ => true,
     };
   }
@@ -69,6 +74,7 @@ class _StaffShellState extends State<StaffShell> {
       onFullscreen: _fullscreen ? null : _toggleFullscreen,
     ),
     Section.menu => const MenuScreen(),
+    Section.discounts => const DiscountsScreen(),
     Section.settings => const SettingsScreen(),
   };
 
@@ -77,7 +83,7 @@ class _StaffShellState extends State<StaffShell> {
     final session = context.staff;
     final sections = [
       for (final s in Section.values)
-        if (s.usedBy(session.settings.flow)) s,
+        if (s.usedBy(session.settings)) s,
     ];
     final section = sections.contains(_section) ? _section : Section.orders;
     final page = KeyedSubtree(

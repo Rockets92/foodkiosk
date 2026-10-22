@@ -189,6 +189,15 @@ class _Body extends StatelessWidget {
         S.muted,
         'esclusi dai totali',
       ),
+      if (context.staff.settings.discounts.enabled ||
+          _int('discountedOrders') > 0)
+        (
+          'Sconti',
+          money(_int('discountCents')),
+          Icons.local_offer_rounded,
+          const Color(0xFF7B4DD8),
+          '${_int('discountedOrders')} ordini con codice',
+        ),
     ];
 
     return ListView(
@@ -219,7 +228,7 @@ class _Body extends StatelessWidget {
         ],
         LayoutBuilder(
           builder: (context, box) {
-            final perRow = box.maxWidth > 1100 ? 5 : 3;
+            final perRow = box.maxWidth > 1100 ? tiles.length : 3;
             final w = (box.maxWidth - 16 * (perRow - 1)) / perRow;
             return Wrap(
               spacing: 16,

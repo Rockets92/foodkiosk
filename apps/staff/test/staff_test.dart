@@ -274,4 +274,88 @@ void main() {
     expect(paid.paymentStatus, PaymentStatus.paid);
     expect(paid.payment?.provider, 'card');
   });
+
+  group('discount codes', () {
+    testWidgets('the list shows uses and a new code can be created', (
+      tester,
+    ) async {
+      final fake = FakeServer();
+      await openShell(tester, fake, Section.discounts);
+      expect(find.byKey(const ValueKey('discount-SCONTO10')), findsOneWidget);
+      expect(find.text('12 / 50 utilizzi'), findsOneWidget);
+      expect(find.text('-10%'), findsOneWidget);
+
+      await tapKey(tester, 'new-discount');
+      await tester.enterText(
+        find.byKey(const ValueKey('discount-code')),
+        'estate5',
+      );
+      await tapKey(tester, 'discount-type');
+      await tester.tap(find.text('Importo fisso'));
+      await settle(tester);
+      await tester.enterText(
+        find.byKey(const ValueKey('discount-amount')),
+        '5',
+      );
+      await tapKey(tester, 'discount-limited');
+      await tester.enterText(
+        find.byKey(const ValueKey('discount-max-uses')),
+        '1',
+      );
+      await tapKey(tester, 'discount-save');
+      final created = fake.discounts.first;
+      expect(created.code, 'ESTATE5');
+      expect(created.type, DiscountType.amount);
+      expect(created.amountCents, 500);
+      expect(created.maxUses, 1);
+
+      await tapKey(tester, 'discount-qr-SCONTO10');
+      expect(find.byKey(const ValueKey('discount-qr')), findsOneWidget);
+    });
+
+    testWidgets('the cashier applies a code to a new order', (tester) async {
+      final fake = FakeServer();
+      await openShell(tester, fake, Section.orders);
+      await tapKey(tester, 'orders-new');
+      await tapKey(tester, 'new-order-cat-drinks');
+      await tapKey(tester, 'new-order-product-cola');
+      await tapKey(tester, 'new-order-product-cola');
+      await tester.enterText(
+        find.byKey(const ValueKey('new-order-code')),
+        'colagratis',
+      );
+      await tapKey(tester, 'new-order-code-apply');
+      expect(find.byKey(const ValueKey('new-order-coupon')), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey('new-order-total'))).data,
+        '2,80 €',
+      );
+      await tapKey(tester, 'new-order-save');
+      expect(fake.counterOrders.single['discountCode'], 'COLAGRATIS');
+      expect(fake.orders.single.totalCents, 280);
+    });
+
+    testWidgets('settings choose how codes are entered', (tester) async {
+      final fake = FakeServer();
+      await openShell(tester, fake, Section.settings);
+      await tapKey(tester, 'discounts-scanner');
+      expect(find.byKey(const ValueKey('scanner-test')), findsOneWidget);
+      await tapKey(tester, 'discounts-manual');
+      await tapKey(tester, 'save-settings');
+      expect(fake.settings.discounts.scanner, isTrue);
+      expect(fake.settings.discounts.manualEntry, isFalse);
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('with codes off the section is hidden', (tester) async {
+      final fake = FakeServer()
+        ..settings = const KioskSettings(
+          discounts: DiscountSettings(enabled: false),
+        );
+      await openShell(tester, fake, Section.orders);
+      expect(find.byKey(const ValueKey('nav-discounts')), findsNothing);
+      await tapKey(tester, 'orders-new');
+      expect(find.byKey(const ValueKey('new-order-code')), findsNothing);
+    });
+  });
 }
