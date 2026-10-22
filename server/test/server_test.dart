@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:kiosk_core/kiosk_core.dart';
 import 'package:kiosk_server/kiosk_server.dart';
@@ -516,6 +517,44 @@ void main() {
   test('ESC/POS encoding maps € and accented letters to PC858', () {
     final bytes = EscPosEncoder(42).encode(const Ticket([TicketText('è 1€')]));
     expect(bytes, containsAllInOrder([0x8a, 0x20, 0x31, 0xd5]));
+  });
+
+  group('customer simulator', () {
+    Future<(int, Object?)> send(String m, String path, Object? body) =>
+        call(m, path, body: body);
+
+    test('places valid orders that reach the cashier', () async {
+      final sim = CustomerSimulator(send, random: Random(7));
+      for (var i = 0; i < 20; i++) {
+        final r = await sim.placeOne();
+        expect(r.order.lines, isNotEmpty);
+        expect(r.outcome, 'paga in cassa');
+      }
+      final (_, body) = await call('GET', '/api/staff/orders', staff: true);
+      expect((body as Map)['orders'], hasLength(20));
+    });
+
+    test('pays on the kiosk when the flow asks for it', () async {
+      await configure({'flow': FlowConfig.fullService.toJson()});
+      final r = await CustomerSimulator(send, random: Random(3)).placeOne();
+      expect(r.order.paymentStatus, PaymentStatus.paid);
+      expect(r.outcome, 'pagato al totem');
+    });
+  });
+
+  group('network info', () {
+    test('lists the LAN addresses and live connections', () async {
+      final (status, body) = await call(
+        'GET',
+        '/api/admin/network',
+        staff: true,
+      );
+      expect(status, 200);
+      expect((body as Map)['addresses'], isA<List<Object?>>());
+      expect(body['devices'], isEmpty);
+      final (denied, _) = await call('GET', '/api/admin/network');
+      expect(denied, 401);
+    });
   });
 
   group('staff screens', () {

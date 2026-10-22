@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:kiosk_core/kiosk_core.dart';
 
 import '../../api.dart';
 import '../theme.dart';
@@ -32,17 +33,24 @@ class _PickupScreenState extends State<PickupScreen> {
   List<int> _ready = [];
   bool _offline = false;
   Timer? _timer;
+  StreamSubscription<ServerEvent>? _events;
 
   @override
   void initState() {
     super.initState();
     _load();
     _timer = Timer.periodic(widget.refresh, (_) => _load());
+    // Standalone (no PIN): keep a live connection too, so announcements
+    // show at once and the server lists this screen among its devices.
+    if (widget.api.pin.isEmpty) {
+      _events = widget.api.events().listen((_) => _load());
+    }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _events?.cancel();
     super.dispose();
   }
 

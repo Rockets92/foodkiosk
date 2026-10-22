@@ -34,7 +34,8 @@ abstract class KioskBackend {
   Future<Order> cancel(String orderId);
 
   /// Checks a staff PIN against the server (for the hidden staff menu).
-  Future<bool> verifyStaffPin(String pin);
+  /// Whether the server accepts [pin]; null when it cannot be reached.
+  Future<bool?> verifyStaffPin(String pin);
 
   /// Live notifications (menu or settings changed).
   Stream<ServerEvent> events();
@@ -132,22 +133,25 @@ class HttpKioskBackend extends KioskBackend {
       Order.fromJson(await _send('POST', '/api/orders/$orderId/cancel'));
 
   @override
-  Future<bool> verifyStaffPin(String pin) async {
+  Future<bool?> verifyStaffPin(String pin) async {
     try {
       final res = await _client
           .get(_u('/api/admin/settings'), headers: {'x-staff-pin': pin})
           .timeout(timeout);
-      return res.statusCode == 200;
+      if (res.statusCode == 200) return true;
+      if (res.statusCode == 401) return false;
+      return null;
     } catch (_) {
-      return false;
+      return null;
     }
   }
 
   @override
   Stream<ServerEvent> events() {
-    final wsUri = _u(
-      '/ws',
-    ).replace(scheme: baseUri.scheme == 'https' ? 'wss' : 'ws');
+    final wsUri = _u('/ws').replace(
+      scheme: baseUri.scheme == 'https' ? 'wss' : 'ws',
+      queryParameters: {'device': 'totem'},
+    );
     late StreamController<ServerEvent> controller;
     WebSocketChannel? channel;
     Timer? retry;

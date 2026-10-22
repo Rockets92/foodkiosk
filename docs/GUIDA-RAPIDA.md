@@ -85,6 +85,12 @@ Suggerimento: il totem è pensato per uno schermo verticale. Su un PC
 normale usa **Food Kiosk Totem in finestra**; nel browser (Strada 2) puoi
 simularlo con **F12** → icona dei dispositivi → dimensione 1080 × 1920.
 
+## Più dispositivi in rete
+
+Per provare un locale vero, con totem, cassa, cucina e schermo ritiro su
+PC diversi e un simulatore di clienti che crea ordini da solo, segui
+[Prova su più dispositivi](PROVA-MULTI-DISPOSITIVO.md).
+
 ## Ripartire da zero
 
 Ferma il server (Gestione attività → FoodKioskServer) e cancella la

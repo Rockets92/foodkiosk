@@ -31,3 +31,11 @@ ALTRI DISPOSITIVI IN RETE
   http://<IP di questo PC>:8080 (nell'app staff nella schermata di accesso,
   nel totem dal menu staff). Se Windows chiede di consentire l'accesso alla
   rete per FoodKioskServer, scegli "Consenti".
+  L'indirizzo esatto e i dispositivi collegati sono nell'app staff, in
+  Impostazioni > Rete.
+
+SIMULATORE CLIENTI
+  simulatore\bin\FoodKioskSimulatore.exe crea ordini di prova come se
+  arrivassero dai totem: chiede l'indirizzo del server e quanti ordini al
+  minuto. Utile per provare cassa, cucina e ritiro. Guida completa:
+  docs/PROVA-MULTI-DISPOSITIVO.md nel repository.

@@ -153,6 +153,18 @@ class FakeServer {
           'valid': flow.isValid,
           'issues': [for (final i in flow.validate()) i.toJson()],
         });
+      case ('GET', '/api/admin/network'):
+        return _json({
+          'hostname': 'CASSA-PC',
+          'addresses': ['192.168.1.20'],
+          'devices': [
+            {
+              'kind': 'totem',
+              'address': '192.168.1.31',
+              'since': DateTime.now().toUtc().toIso8601String(),
+            },
+          ],
+        });
       case ('GET', '/api/admin/adapters'):
         return _json({
           'payment': ['none', 'demo'],

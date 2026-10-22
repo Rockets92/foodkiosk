@@ -9,4 +9,5 @@ export 'src/adapters/registry.dart';
 export 'src/app.dart';
 export 'src/database.dart';
 export 'src/errors.dart';
+export 'src/simulator.dart';
 export 'src/tickets.dart';

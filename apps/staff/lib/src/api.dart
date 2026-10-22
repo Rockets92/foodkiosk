@@ -129,6 +129,10 @@ class StaffApi {
     ];
   }
 
+  /// The server PC's LAN addresses and the devices connected right now.
+  Future<NetworkInfo> network() async =>
+      NetworkInfo.fromJson(await _map('GET', '/api/admin/network'));
+
   /// Adapter types the server knows: `{payment: [...], fiscal: [...],
   /// printer: [...]}`.
   Future<Map<String, List<String>>> adapters() async {
@@ -306,8 +310,10 @@ class StaffApi {
 
   /// Live server events (orders, menu, settings), reconnecting on loss.
   Stream<ServerEvent> events() {
+    // The pickup-only screen has no PIN; the server lists it as such.
     final wsUri = _u('/ws', {
       'pin': pin,
+      'device': pin.isEmpty ? 'pickup' : 'staff',
     }).replace(scheme: baseUri.scheme == 'https' ? 'wss' : 'ws');
     late StreamController<ServerEvent> controller;
     WebSocketChannel? channel;
@@ -375,4 +381,46 @@ class CounterPayment {
     'cardCents': ?cardCents,
     'receivedCents': ?receivedCents,
   };
+}
+
+/// What the server PC reports about the local network.
+class NetworkInfo {
+  final String hostname;
+
+  /// This PC's LAN addresses, without port.
+  final List<String> addresses;
+  final List<ConnectedDevice> devices;
+
+  const NetworkInfo({
+    this.hostname = '',
+    this.addresses = const [],
+    this.devices = const [],
+  });
+
+  factory NetworkInfo.fromJson(Map<String, Object?> json) => NetworkInfo(
+    hostname: json['hostname'] as String? ?? '',
+    addresses: [for (final a in json['addresses'] as List? ?? []) a as String],
+    devices: [
+      for (final d in json['devices'] as List? ?? [])
+        ConnectedDevice.fromJson((d as Map).cast()),
+    ],
+  );
+}
+
+/// A totem, staff station or pickup screen with a live connection.
+class ConnectedDevice {
+  /// `totem`, `staff`, `pickup` or `other`.
+  final String kind;
+  final String address;
+  final DateTime since;
+
+  const ConnectedDevice(this.kind, this.address, this.since);
+
+  factory ConnectedDevice.fromJson(Map<String, Object?> json) =>
+      ConnectedDevice(
+        json['kind'] as String? ?? 'other',
+        json['address'] as String? ?? '',
+        DateTime.tryParse(json['since'] as String? ?? '')?.toLocal() ??
+            DateTime.now(),
+      );
 }

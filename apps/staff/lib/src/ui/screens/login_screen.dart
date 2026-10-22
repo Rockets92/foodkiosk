@@ -41,9 +41,11 @@ class _LoginScreenState extends State<LoginScreen> {
   Uri? get _serverUri {
     var text = _server.text.trim();
     if (text.isEmpty) return null;
-    if (!text.startsWith('http')) text = 'http://$text';
-    if (!text.endsWith('/')) text = '$text/';
-    return Uri.tryParse(text);
+    final bare = !text.contains('://');
+    final uri = Uri.tryParse(bare ? 'http://$text' : text);
+    if (uri == null || uri.host.isEmpty) return null;
+    // A bare host gets the server's default port.
+    return uri.replace(port: bare && !uri.hasPort ? 8080 : uri.port, path: '/');
   }
 
   Future<void> _submit() async {

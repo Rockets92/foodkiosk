@@ -23,7 +23,50 @@ Future<Uri> loadServerUri() async {
   return Uri.parse('http://localhost:8080/');
 }
 
+/// Reads an address as typed by staff: a bare `192.168.1.20` is taken as
+/// `http://192.168.1.20:8080/`, the server's default port.
+Uri? parseServerAddress(String text) {
+  final t = text.trim();
+  if (t.isEmpty) return null;
+  final bare = !t.contains('://');
+  final uri = Uri.tryParse(bare ? 'http://$t' : t);
+  if (uri == null || uri.host.isEmpty) return null;
+  return uri.replace(
+    port: bare && !uri.hasPort ? 8080 : uri.port,
+    path: '/',
+    query: null,
+    fragment: null,
+  );
+}
+
 Future<void> saveServerUri(Uri uri) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.setString(_serverKey, uri.toString());
+}
+
+const _pinKey = 'staffPin';
+
+/// The staff PIN last accepted by the server, remembered so the staff
+/// menu still opens while the server is unreachable (wrong address, server
+/// PC off): otherwise a full-screen totem could not be pointed elsewhere
+/// or closed.
+Future<void> rememberStaffPin(String pin) async {
+  try {
+    await (await SharedPreferences.getInstance()).setString(_pinKey, pin);
+  } catch (_) {
+    // Not persisted: offline access falls back to the factory PIN.
+  }
+}
+
+/// Whether [pin] opens the staff menu while the server is unreachable: the
+/// last PIN the server accepted, or the factory PIN 1234 on a totem that
+/// never reached a server.
+Future<bool> offlinePinMatches(String pin) async {
+  String? saved;
+  try {
+    saved = (await SharedPreferences.getInstance()).getString(_pinKey);
+  } catch (_) {
+    saved = null;
+  }
+  return pin == (saved ?? '1234');
 }

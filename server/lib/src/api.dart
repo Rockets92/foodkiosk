@@ -47,6 +47,21 @@ const _publicEvents = {
   ServerEvent.pickupAnnounce,
 };
 
+/// A device listening for live events: a totem, a staff station or a
+/// pickup screen.
+class ConnectedDevice {
+  final String kind;
+  final String address;
+  final DateTime since;
+  ConnectedDevice(this.kind, this.address, this.since);
+
+  Map<String, Object?> toJson() => {
+    'kind': kind,
+    'address': address,
+    'since': since.toUtc().toIso8601String(),
+  };
+}
+
 class Api {
   final SettingsService settings;
   final MenuService menu;
@@ -58,6 +73,9 @@ class Api {
   final AdapterRegistry registry;
   final EventBus bus;
   final Handler? mediaHandler;
+
+  /// Devices with an open live connection, for the "Rete" settings.
+  final Set<ConnectedDevice> devices = {};
 
   Api({
     required this.settings,
@@ -280,6 +298,7 @@ class Api {
         });
       })
       ..get('/admin/adapters', (Request _) => _ok(registry.describe()))
+      ..get('/admin/network', (Request _) async => _ok(await _network()))
       ..post('/admin/media', _upload)
       ..get('/admin/menu', (Request _) => _ok(menu.fullMenu().toJson()))
       ..post(
@@ -397,16 +416,46 @@ class Api {
 
   FutureOr<Response> _webSocket(Request req) {
     final staff = _isStaff(req);
+    final info = req.context['shelf.io.connection_info'];
+    final device = ConnectedDevice(
+      req.url.queryParameters['device'] ?? (staff ? 'staff' : 'other'),
+      info is HttpConnectionInfo ? info.remoteAddress.address : '',
+      DateTime.now(),
+    );
     return webSocketHandler((channel, _) {
+      devices.add(device);
       final sub = bus.stream
           .where((e) => staff || _publicEvents.contains(e.type))
           .listen((e) => channel.sink.add(jsonEncode(e.toJson())));
-      channel.stream.listen(
-        (_) {},
-        onDone: sub.cancel,
-        onError: (_) => sub.cancel(),
-      );
+      void gone() {
+        devices.remove(device);
+        sub.cancel();
+      }
+
+      channel.stream.listen((_) {}, onDone: gone, onError: (_) => gone());
     })(req);
+  }
+
+  /// This PC's LAN addresses (the other devices use one of them, with the
+  /// server's port) and the devices connected right now.
+  Future<Map<String, Object?>> _network() async {
+    var addresses = <String>[];
+    try {
+      addresses = [
+        for (final i in await NetworkInterface.list(
+          type: InternetAddressType.IPv4,
+        ))
+          for (final a in i.addresses)
+            if (!a.isLoopback && !a.isLinkLocal) a.address,
+      ];
+    } on SocketException {
+      // No interfaces to report.
+    }
+    return {
+      'hostname': Platform.localHostname,
+      'addresses': addresses,
+      'devices': [for (final d in devices) d.toJson()],
+    };
   }
 }
 

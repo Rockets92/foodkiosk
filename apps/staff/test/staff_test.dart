@@ -169,6 +169,25 @@ void main() {
       fake.settings.flow.actionsFor(FlowEvent.submitted),
       contains(FlowAction.sendToKitchenDisplay),
     );
+    // The network section polls: stop it before the test ends.
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('settings: the network section shows the server address', (
+    tester,
+  ) async {
+    final fake = FakeServer();
+    await openShell(tester, fake, Section.settings);
+    await tester.ensureVisible(find.text('Rete').last);
+    await settle(tester);
+    expect(
+      find.byKey(const ValueKey('address-http://192.168.1.20:80')),
+      findsOneWidget,
+    );
+    expect(find.text('Collegati ora (1)'), findsOneWidget);
+    expect(find.text('Totem'), findsOneWidget);
+    expect(find.text('192.168.1.31'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('menu: a product can be marked sold out', (tester) async {

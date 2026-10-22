@@ -4,11 +4,13 @@ import 'dart:io' show exit;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../config.dart';
 import '../scope.dart';
 
 /// Invisible area in the top-left corner: a 3 second press opens the
 /// staff menu (after the PIN), to change the server address or close the
-/// app. Customers never see it.
+/// app. Customers never see it. While the server is unreachable the PIN is
+/// checked against the last one the server accepted.
 class StaffCorner extends StatefulWidget {
   final Future<void> Function(Uri) onServerChanged;
   const StaffCorner({super.key, required this.onServerChanged});
@@ -47,7 +49,9 @@ class _StaffCornerState extends State<StaffCorner> {
     final k = context.kiosk;
     final pin = await _prompt('PIN', obscure: true);
     if (pin == null || !mounted) return;
-    if (!await k.backend.verifyStaffPin(pin)) {
+    final verified = await k.backend.verifyStaffPin(pin);
+    if (verified == true) await rememberStaffPin(pin);
+    if (!(verified ?? await offlinePinMatches(pin))) {
       if (mounted) {
         ScaffoldMessenger.maybeOf(
           context,
@@ -72,8 +76,8 @@ class _StaffCornerState extends State<StaffCorner> {
                 'Indirizzo server',
                 initial: k.backend.baseUri.toString(),
               );
-              final uri = url == null ? null : Uri.tryParse(url.trim());
-              if (uri != null && uri.hasScheme) {
+              final uri = url == null ? null : parseServerAddress(url);
+              if (uri != null) {
                 await widget.onServerChanged(uri);
               }
             },
