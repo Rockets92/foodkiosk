@@ -726,24 +726,25 @@ class _OrderBarState extends State<OrderBar>
                                 (1 - _bump.value),
                         child: child,
                       ),
-                      child: Container(
-                        key: CartFlight.targetKey,
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          color: empty ? K.background : K.yellow,
-                          shape: BoxShape.circle,
+                      child: Badge(
+                        isLabelVisible: !empty,
+                        backgroundColor: K.red,
+                        offset: const Offset(-8, -8),
+                        label: Text(
+                          '${k.itemCount}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                        child: Badge(
-                          isLabelVisible: !empty,
-                          backgroundColor: K.red,
-                          offset: const Offset(10, -10),
-                          label: Text(
-                            '${k.itemCount}',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                            ),
+                        child: Container(
+                          key: CartFlight.targetKey,
+                          width: 72,
+                          height: 72,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: empty ? K.background : K.yellow,
+                            shape: BoxShape.circle,
                           ),
                           child: Icon(
                             Icons.shopping_bag_rounded,
