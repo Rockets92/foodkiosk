@@ -153,7 +153,7 @@ class _ProductScreenState extends State<ProductScreen> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: K.yellow,
+                            color: K.accent,
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Text(
@@ -174,7 +174,7 @@ class _ProductScreenState extends State<ProductScreen> {
                       children: [
                         Text(
                           context.money(p.priceCents),
-                          style: KText.h2.copyWith(color: K.red),
+                          style: KText.h2.copyWith(color: K.primary),
                         ),
                         const SizedBox(width: 18),
                         if (k.settings.showCalories && p.kcal != null)
@@ -477,10 +477,10 @@ class _OptionCard extends StatelessWidget {
         width: 210,
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFFFF4F1) : Colors.white,
+          color: selected ? K.primaryFaint : Colors.white,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: selected ? K.red : K.line,
+            color: selected ? K.primary : K.line,
             width: selected ? 4 : 2,
           ),
           boxShadow: selected ? K.shadow : null,
@@ -532,8 +532,8 @@ class _OptionCard extends StatelessWidget {
                 child: Container(
                   width: 36,
                   height: 36,
-                  decoration: const BoxDecoration(
-                    color: K.red,
+                  decoration: BoxDecoration(
+                    color: K.primary,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -592,7 +592,7 @@ class _OptionChip extends StatelessWidget {
                           ? Icons.radio_button_unchecked_rounded
                           : Icons.add_circle_outline_rounded),
                 key: ValueKey(selected),
-                color: selected ? K.yellow : K.muted,
+                color: selected ? K.accent : K.muted,
                 size: 28,
               ),
             ),

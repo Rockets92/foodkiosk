@@ -315,7 +315,7 @@ class SecuritySection extends StatelessWidget {
             err ??
                 'Lascia vuoto per mantenere il PIN attuale. Dopo il '
                     'cambio dovrai accedere di nuovo.',
-            style: ST.small.copyWith(color: err == null ? S.inkSoft : S.red),
+            style: ST.small.copyWith(color: err == null ? S.inkSoft : S.danger),
           ),
         ],
       ),

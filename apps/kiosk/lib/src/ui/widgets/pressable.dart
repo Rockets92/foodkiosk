@@ -52,7 +52,9 @@ class KButton extends StatelessWidget {
   final VoidCallback? onTap;
   final IconData? icon;
   final Widget? trailing;
-  final Color color;
+
+  /// Defaults to the palette's primary colour.
+  final Color? color;
   final Color foreground;
   final double height;
   final bool expand;
@@ -63,7 +65,7 @@ class KButton extends StatelessWidget {
     this.onTap,
     this.icon,
     this.trailing,
-    this.color = K.red,
+    this.color,
     this.foreground = Colors.white,
     this.height = 84,
     this.expand = false,
@@ -83,6 +85,7 @@ class KButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
+    final color = this.color ?? K.primary;
     final content = Row(
       mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: trailing == null

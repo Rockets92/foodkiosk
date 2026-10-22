@@ -86,8 +86,8 @@ class _PickupScreenState extends State<PickupScreen> {
                   title: 'Pronto! Ritira qui',
                   icon: Icons.check_circle_rounded,
                   numbers: _ready,
-                  background: S.red,
-                  numberColor: S.yellow,
+                  background: S.primary,
+                  numberColor: S.accent,
                   numberSize: 96,
                   highlight: true,
                 ),
@@ -95,14 +95,14 @@ class _PickupScreenState extends State<PickupScreen> {
             ],
           ),
           if (_offline)
-            const Positioned(
+            Positioned(
               left: 0,
               right: 0,
               bottom: 16,
               child: Center(
                 child: Pill(
                   'Connessione al server persa',
-                  color: S.yellow,
+                  color: S.accent,
                   icon: Icons.wifi_off_rounded,
                 ),
               ),

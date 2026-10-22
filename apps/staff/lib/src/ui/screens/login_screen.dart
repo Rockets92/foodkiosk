@@ -108,6 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         logo,
                         width: 72,
                         height: 72,
+                        colorMapper: PaletteColorMapper(S.palette),
                         placeholderBuilder: (_) =>
                             const SizedBox.square(dimension: 72),
                         errorBuilder: (_, _, _) =>
@@ -130,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 _error!,
                                 key: const ValueKey('login-error'),
                                 style: const TextStyle(
-                                  color: S.red,
+                                  color: S.danger,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -224,7 +225,7 @@ class _PinDots extends StatelessWidget {
             height: 18,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: i < length ? (error ? S.red : S.ink) : S.line,
+              color: i < length ? (error ? S.danger : S.ink) : S.line,
             ),
           ),
       ],

@@ -244,7 +244,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 28),
                     child: Pill(
                       _error!,
-                      color: S.red,
+                      color: S.danger,
                       icon: Icons.wifi_off_rounded,
                     ),
                   ),
@@ -335,7 +335,7 @@ class _OrderRow extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: selected ? S.red : S.line,
+              color: selected ? S.primary : S.line,
               width: selected ? 2 : 1,
             ),
           ),
@@ -400,7 +400,7 @@ class _OrderRow extends StatelessWidget {
                       runSpacing: 4,
                       children: [
                         if (cancelled)
-                          const Pill('Annullato', color: S.red)
+                          Pill('Annullato', color: S.danger)
                         else ...[
                           Pill(payText, color: payColor),
                           if (order.kitchenStatus != KitchenStatus.none)
@@ -542,7 +542,7 @@ class _OrderDetailState extends State<_OrderDetail> {
         children: [
           Container(
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 18),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(bottom: BorderSide(color: S.line)),
             ),
             child: Row(
@@ -586,7 +586,7 @@ class _OrderDetailState extends State<_OrderDetail> {
                   const SizedBox(height: 18),
                 ],
                 for (final l in order.lines) _LineTile(line: l, money: money),
-                const Divider(height: 28, color: S.line),
+                Divider(height: 28, color: S.line),
                 for (final e in order.vatBreakdown.entries)
                   _AmountRow(
                     'di cui IVA ${_rate(e.key)}%',
@@ -607,7 +607,7 @@ class _OrderDetailState extends State<_OrderDetail> {
           if (order.status == OrderStatus.open)
             Container(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(top: BorderSide(color: S.line)),
               ),
               child: Column(
@@ -660,7 +660,7 @@ class _OrderDetailState extends State<_OrderDetail> {
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
                       key: const ValueKey('cancel-order'),
-                      style: TextButton.styleFrom(foregroundColor: S.red),
+                      style: TextButton.styleFrom(foregroundColor: S.primary),
                       onPressed: _busy ? null : _cancel,
                       icon: const Icon(Icons.cancel_outlined),
                       label: const Text('Annulla ordine'),
@@ -693,20 +693,20 @@ class _FailedBox extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: S.red.withValues(alpha: 0.07),
+      color: S.danger.withValues(alpha: 0.07),
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: S.red.withValues(alpha: 0.3)),
+      border: Border.all(color: S.danger.withValues(alpha: 0.3)),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.error_outline_rounded, color: S.red),
+            Icon(Icons.error_outline_rounded, color: S.danger),
             SizedBox(width: 8),
             Text(
               'Operazioni non riuscite',
-              style: TextStyle(fontWeight: FontWeight.w700, color: S.red),
+              style: TextStyle(fontWeight: FontWeight.w700, color: S.danger),
             ),
           ],
         ),
@@ -942,20 +942,20 @@ class _HistoryTile extends StatelessWidget {
       'paymentStarted' => ('Pagamento avviato sul totem', S.info),
       'paymentFailed' => (
         'Pagamento rifiutato${e.detail == null ? '' : ': ${e.detail}'}',
-        S.red,
+        S.danger,
       ),
       'paid' => ('Pagato', S.success),
       'switchedToCounter' => ('Il cliente pagherà in cassa', S.warning),
       'action' => (actionName(e.detail), S.success),
       'actionFailed' => (
         '${actionName(e.detail)} non riuscito: ${errorOf(e.detail)}',
-        S.red,
+        S.danger,
       ),
       'cancelled' => (
         'Annullato${e.detail == null ? '' : ' (${e.detail})'}',
-        S.red,
+        S.danger,
       ),
-      'refundRequired' => ('Da rimborsare', S.red),
+      'refundRequired' => ('Da rimborsare', S.danger),
       'completed' => ('Completato', S.success),
       final t when t.startsWith('kitchen.') => (
         'Cucina: ${kitchenStatusLabel(KitchenStatus.parse(t.substring(8))).$1}',

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:kiosk_core/kiosk_core.dart';
 
 import '../api.dart';
 import '../config.dart';
@@ -23,7 +24,8 @@ class StaffApp extends StatefulWidget {
 }
 
 class _StaffAppState extends State<StaffApp> {
-  final _theme = staffTheme();
+  ColorPalette _palette = ColorPalette.fallback;
+  late ThemeData _theme = staffTheme(_palette);
   StaffSession? _session;
   StaffApi? _pickupApi;
   Uri? _server;
@@ -35,8 +37,44 @@ class _StaffAppState extends State<StaffApp> {
     _session = widget.session;
     if (_session != null) {
       _loading = false;
+      _follow(_session!);
     } else {
       _restore();
+    }
+  }
+
+  @override
+  void dispose() {
+    _session?.removeListener(_syncPalette);
+    super.dispose();
+  }
+
+  void _usePalette(ColorPalette next) {
+    if (next.id == _palette.id || !mounted) return;
+    setState(() {
+      _palette = next;
+      _theme = staffTheme(next);
+    });
+    rebuildAll(context);
+  }
+
+  /// Logged in: the palette follows the session settings live.
+  void _follow(StaffSession session) {
+    session.addListener(_syncPalette);
+    _palette = session.settings.colors;
+    _theme = staffTheme(_palette);
+  }
+
+  void _syncPalette() {
+    if (_session case final s?) _usePalette(s.settings.colors);
+  }
+
+  /// Not logged in (login, pickup screen): read the public settings.
+  Future<void> _loadPublicPalette(StaffApi api) async {
+    try {
+      _usePalette((await api.publicSettings()).colors);
+    } catch (_) {
+      // Server not reachable yet: keep the current palette.
     }
   }
 
@@ -57,7 +95,9 @@ class _StaffAppState extends State<StaffApp> {
       _server = server;
       _session = session;
       _loading = false;
+      if (session != null) _follow(session);
     });
+    if (session == null) _loadPublicPalette(widget.apiFactory(server, ''));
   }
 
   void _loggedIn(StaffSession session, Uri server) {
@@ -65,17 +105,25 @@ class _StaffAppState extends State<StaffApp> {
     setState(() {
       _server = server;
       _session = session;
+      _follow(session);
     });
   }
 
   void _logout() {
     final s = _session;
     if (_server != null) saveLogin(_server!, null);
+    s?.removeListener(_syncPalette);
     setState(() {
       _session = null;
       _pickupApi = null;
     });
     s?.dispose();
+  }
+
+  void _openPickup(Uri server) {
+    final api = widget.apiFactory(server, '');
+    setState(() => _pickupApi = api);
+    _loadPublicPalette(api);
   }
 
   @override
@@ -98,8 +146,7 @@ class _StaffAppState extends State<StaffApp> {
         initialServer: _server ?? defaultServerUri(),
         apiFactory: widget.apiFactory,
         onLoggedIn: _loggedIn,
-        onPickupOnly: (server) =>
-            setState(() => _pickupApi = widget.apiFactory(server, '')),
+        onPickupOnly: _openPickup,
       );
     }
     return MaterialApp(

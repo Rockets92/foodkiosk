@@ -48,7 +48,7 @@ class CartScreen extends StatelessWidget {
                           k.serviceMode == ServiceMode.eatIn
                               ? Icons.restaurant_rounded
                               : Icons.shopping_bag_rounded,
-                          color: K.red,
+                          color: K.primary,
                         ),
                         const SizedBox(width: 8),
                         Text(
@@ -170,18 +170,14 @@ class _CartLineTile extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.edit_rounded,
-                            size: 20,
-                            color: K.red,
-                          ),
+                          Icon(Icons.edit_rounded, size: 20, color: K.primary),
                           const SizedBox(width: 6),
                           Text(
                             t('edit'),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w700,
-                              color: K.red,
+                              color: K.primary,
                             ),
                           ),
                         ],
@@ -262,7 +258,7 @@ class _Upsell extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Icon(Icons.auto_awesome_rounded, color: K.red),
+            Icon(Icons.auto_awesome_rounded, color: K.primary),
             const SizedBox(width: 8),
             Text(t('upsellTitle'), style: KText.h2),
           ],
@@ -319,21 +315,21 @@ class _CheckoutPanel extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 18),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFE9E5),
+                color: K.dangerSoft,
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_rounded, color: K.red),
+                  const Icon(Icons.error_rounded, color: K.danger),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       t(k.errorKey!),
                       key: const ValueKey('cart-error'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
-                        color: K.redDark,
+                        color: K.dangerDark,
                       ),
                     ),
                   ),
@@ -363,11 +359,11 @@ class _CheckoutPanel extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const SizedBox.square(
+                  SizedBox.square(
                     dimension: 40,
                     child: CircularProgressIndicator(
                       strokeWidth: 5,
-                      color: K.red,
+                      color: K.primary,
                     ),
                   ),
                   const SizedBox(width: 20),
@@ -453,7 +449,7 @@ class _CheckoutPanel extends StatelessWidget {
                       icon: Icons.contactless_rounded,
                       label: t('payHere'),
                       sub: t('payHereSub'),
-                      color: K.red,
+                      color: K.primary,
                       onTap: () => Navigator.pop(ctx, PaymentMode.kiosk),
                     ),
                   ),

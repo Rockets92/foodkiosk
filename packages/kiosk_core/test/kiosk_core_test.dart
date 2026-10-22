@@ -139,4 +139,24 @@ void main() {
       '/media/fries.png',
     );
   });
+
+  test('the colour palette travels with the settings', () {
+    const s = KioskSettings(palette: 'fresh');
+    expect(s.toPublicJson()['palette'], 'fresh');
+    expect(KioskSettings.fromJson(s.toJson()).colors, ColorPalette.fresh);
+    expect(const KioskSettings().colors, ColorPalette.classic);
+    expect(
+      const KioskSettings(palette: 'nope').validate(),
+      contains(contains('palette')),
+    );
+    final ids = {for (final p in ColorPalette.presets) p.id};
+    expect(ids, hasLength(ColorPalette.presets.length));
+  });
+
+  test('artwork colours follow the palette', () {
+    const p = ColorPalette.ocean;
+    expect(p.recolor(0xFFD62300), p.primary);
+    expect(p.recolor(0x80FFC72C), (p.accent & 0xFFFFFF) | 0x80000000);
+    expect(p.recolor(0xFF5A2E14), 0xFF5A2E14, reason: 'food is kept');
+  });
 }

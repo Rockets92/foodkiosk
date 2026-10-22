@@ -444,7 +444,7 @@ class _ProductTile extends StatelessWidget {
                   product.soldOut ? 'Esaurito' : money(product.priceCents),
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
-                    color: product.soldOut ? S.muted : S.red,
+                    color: product.soldOut ? S.muted : S.primary,
                   ),
                 ),
               ],

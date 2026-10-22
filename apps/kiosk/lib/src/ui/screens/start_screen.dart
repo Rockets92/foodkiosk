@@ -118,9 +118,7 @@ class _ModeCard extends StatelessWidget {
             Expanded(
               child: Container(
                 width: double.infinity,
-                color: eatIn
-                    ? const Color(0xFFFFE9D6)
-                    : const Color(0xFFFFF1C7),
+                color: eatIn ? K.primarySoft : K.accentSoft,
                 padding: const EdgeInsets.all(28),
                 child: Illustration(eatIn ? 'eat_in' : 'take_away'),
               ),
@@ -134,7 +132,7 @@ class _ModeCard extends StatelessWidget {
                     eatIn
                         ? Icons.restaurant_rounded
                         : Icons.shopping_bag_rounded,
-                    color: K.red,
+                    color: K.primary,
                     size: 36,
                   ),
                   const SizedBox(width: 12),

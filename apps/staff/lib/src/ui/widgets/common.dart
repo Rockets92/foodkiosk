@@ -108,7 +108,16 @@ class ServerImage extends StatelessWidget {
   final String? path;
   final double size;
   final double radius;
-  const ServerImage(this.path, {super.key, this.size = 56, this.radius = 14});
+
+  /// Repaints an SVG in the palette colours (for the placeholder logo).
+  final bool recolor;
+  const ServerImage(
+    this.path, {
+    super.key,
+    this.size = 56,
+    this.radius = 14,
+    this.recolor = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -125,6 +134,7 @@ class ServerImage extends StatelessWidget {
       image = SvgPicture.network(
         url,
         fit: BoxFit.contain,
+        colorMapper: recolor ? PaletteColorMapper(S.palette) : null,
         placeholderBuilder: (_) => placeholder,
         errorBuilder: (_, _, _) => placeholder,
       );
@@ -206,7 +216,7 @@ Future<bool> confirm(
           FilledButton(
             key: const ValueKey('confirm-yes'),
             style: destructive
-                ? FilledButton.styleFrom(backgroundColor: S.red)
+                ? FilledButton.styleFrom(backgroundColor: S.primary)
                 : null,
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(confirmLabel),
@@ -220,7 +230,7 @@ void showMessage(BuildContext context, String text, {bool error = false}) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(
-      SnackBar(content: Text(text), backgroundColor: error ? S.red : S.ink),
+      SnackBar(content: Text(text), backgroundColor: error ? S.primary : S.ink),
     );
 }
 
@@ -250,7 +260,7 @@ IconData serviceModeIcon(ServiceMode m) => switch (m) {
   PaymentStatus.awaitingKiosk => ('Attesa pagamento totem', S.warning),
   PaymentStatus.processing => ('Pagamento in corso', S.info),
   PaymentStatus.paid => ('Pagato', S.success),
-  PaymentStatus.failed => ('Pagamento rifiutato', S.red),
+  PaymentStatus.failed => ('Pagamento rifiutato', S.primary),
   PaymentStatus.refunded => ('Rimborsato', S.muted),
 };
 
@@ -265,7 +275,7 @@ IconData serviceModeIcon(ServiceMode m) => switch (m) {
 (String, Color) orderStatusLabel(OrderStatus s) => switch (s) {
   OrderStatus.open => ('Aperto', S.info),
   OrderStatus.completed => ('Completato', S.success),
-  OrderStatus.cancelled => ('Annullato', S.red),
+  OrderStatus.cancelled => ('Annullato', S.primary),
 };
 
 String flowActionLabel(FlowAction a) => switch (a) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kiosk_core/kiosk_core.dart';
 
 import '../state/kiosk_controller.dart';
 import 'scope.dart';
@@ -14,8 +15,6 @@ import 'widgets/common.dart';
 import 'widgets/idle_watcher.dart';
 import 'widgets/staff_corner.dart';
 
-final _theme = kioskTheme();
-
 class KioskApp extends StatelessWidget {
   final KioskController controller;
   final Future<void> Function(Uri) onServerChanged;
@@ -30,15 +29,59 @@ class KioskApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return KioskScope(
       controller: controller,
-      child: MaterialApp(
-        title: 'Food Kiosk',
-        debugShowCheckedModeBanner: false,
-        theme: _theme,
-        builder: (context, child) => _FitToScreen(child: child!),
-        home: _Shell(onServerChanged: onServerChanged),
+      child: _Themed(
+        controller: controller,
+        builder: (theme) => MaterialApp(
+          title: 'Food Kiosk',
+          debugShowCheckedModeBanner: false,
+          theme: theme,
+          builder: (context, child) => _FitToScreen(child: child!),
+          home: _Shell(onServerChanged: onServerChanged),
+        ),
       ),
     );
   }
+}
+
+/// Follows the palette of the server settings, rebuilding the theme only
+/// when it changes.
+class _Themed extends StatefulWidget {
+  final KioskController controller;
+  final Widget Function(ThemeData theme) builder;
+  const _Themed({required this.controller, required this.builder});
+
+  @override
+  State<_Themed> createState() => _ThemedState();
+}
+
+class _ThemedState extends State<_Themed> {
+  late ColorPalette _palette = widget.controller.settings.colors;
+  late ThemeData _theme = kioskTheme(_palette);
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_sync);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_sync);
+    super.dispose();
+  }
+
+  void _sync() {
+    final next = widget.controller.settings.colors;
+    if (next.id == _palette.id) return;
+    setState(() {
+      _palette = next;
+      _theme = kioskTheme(next);
+    });
+    rebuildAll(context);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(_theme);
 }
 
 class _Shell extends StatelessWidget {

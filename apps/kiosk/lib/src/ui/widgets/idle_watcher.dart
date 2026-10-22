@@ -110,7 +110,7 @@ class _IdleWatcherState extends State<IdleWatcher> {
                                     child: CircularProgressIndicator(
                                       value: _secondsLeft! / total,
                                       strokeWidth: 12,
-                                      color: K.red,
+                                      color: K.primary,
                                       backgroundColor: K.line,
                                     ),
                                   ),

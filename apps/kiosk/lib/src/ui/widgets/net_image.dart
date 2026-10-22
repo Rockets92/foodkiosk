@@ -2,13 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../scope.dart';
+import '../theme.dart';
 
 /// Image from the server; supports the SVG illustrations and real photos.
 class NetImage extends StatelessWidget {
   final String? path;
   final BoxFit fit;
 
-  const NetImage(this.path, {super.key, this.fit = BoxFit.contain});
+  /// Repaints an SVG in the palette colours (for the placeholder logo).
+  final bool recolor;
+
+  const NetImage(
+    this.path, {
+    super.key,
+    this.fit = BoxFit.contain,
+    this.recolor = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +34,7 @@ class NetImage extends StatelessWidget {
       return SvgPicture.network(
         url,
         fit: fit,
+        colorMapper: recolor ? PaletteColorMapper(K.palette) : null,
         placeholderBuilder: (_) => const SizedBox.expand(),
       );
     }
@@ -46,12 +56,16 @@ class NetImage extends StatelessWidget {
 class Illustration extends StatelessWidget {
   final String name;
   final double? size;
-  const Illustration(this.name, {super.key, this.size});
+
+  /// Repaints the brand red and yellow in the palette colours.
+  final bool recolor;
+  const Illustration(this.name, {super.key, this.size, this.recolor = true});
 
   @override
   Widget build(BuildContext context) => SvgPicture.asset(
     'assets/illustrations/$name.svg',
     width: size,
     height: size,
+    colorMapper: recolor ? PaletteColorMapper(K.palette) : null,
   );
 }

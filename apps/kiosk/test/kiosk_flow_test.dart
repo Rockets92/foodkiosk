@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kiosk_app/src/state/cart.dart';
 import 'package:kiosk_app/src/state/kiosk_controller.dart';
 import 'package:kiosk_app/src/ui/kiosk_app.dart';
+import 'package:kiosk_app/src/ui/theme.dart';
 import 'package:kiosk_app/src/ui/widgets/pressable.dart';
 import 'package:kiosk_core/kiosk_core.dart';
 
@@ -198,5 +199,27 @@ void main() {
     expect(k.cartTotal, (990 + 80) * 2 + 990);
     k.setQuantity(1, 0);
     expect(k.cart, hasLength(1));
+  });
+
+  testWidgets('the palette from the server restyles the kiosk live', (
+    tester,
+  ) async {
+    final backend = FakeBackend(
+      settings: const KioskSettings(palette: 'ocean'),
+    );
+    final k = await pumpKiosk(tester, backend);
+    await goToMenu(tester);
+    Color primary() => Theme.of(
+      tester.element(find.byType(Scaffold).first),
+    ).colorScheme.primary;
+    expect(K.palette.id, 'ocean');
+    expect(primary(), Color(ColorPalette.ocean.primary));
+
+    backend.settingsValue = const KioskSettings(palette: 'berry');
+    await k.reload();
+    await settle(tester);
+    expect(K.palette.id, 'berry');
+    expect(primary(), Color(ColorPalette.berry.primary));
+    expect(k.step, KioskStep.menu, reason: 'the customer keeps their place');
   });
 }

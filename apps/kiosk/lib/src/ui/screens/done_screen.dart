@@ -50,7 +50,7 @@ class _DoneScreenState extends State<DoneScreen>
     return Scaffold(
       key: const ValueKey('done'),
       body: DecoratedBox(
-        decoration: const BoxDecoration(gradient: K.heroGradient),
+        decoration: BoxDecoration(gradient: K.heroGradient),
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -231,7 +231,7 @@ class _NewOrderButton extends StatelessWidget {
                     CircularProgressIndicator(
                       value: 1 - countdown.value,
                       strokeWidth: 6,
-                      color: K.red,
+                      color: K.primary,
                       backgroundColor: K.line,
                     ),
                     Text(
@@ -246,7 +246,7 @@ class _NewOrderButton extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 18),
-            Text(label, style: KText.button.copyWith(color: K.red)),
+            Text(label, style: KText.button.copyWith(color: K.primary)),
           ],
         ),
       ),
@@ -295,8 +295,8 @@ class _Piece {
       spin = r.nextDouble() * 8,
       size = 10 + r.nextDouble() * 14,
       delay = r.nextDouble() * 0.3,
-      color = const [
-        K.yellow,
+      color = [
+        K.accent,
         Colors.white,
         Color(0xFFFF8F1F),
         Color(0xFF7CC94A),

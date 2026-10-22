@@ -1,5 +1,6 @@
 import 'flow.dart';
 import 'order.dart';
+import 'palette.dart';
 
 /// Which implementation of a pluggable component to use, plus its options
 /// (e.g. `{type: escposNetwork, options: {host: 192.168.1.50, port: 9100}}`).
@@ -59,6 +60,9 @@ class KioskSettings {
   /// PIN for the admin panel and the staff endpoints.
   final String adminPin;
 
+  /// Id of the [ColorPalette] used by the kiosk and the staff app.
+  final String palette;
+
   const KioskSettings({
     this.venueName = 'Food Kiosk',
     this.demoMode = true,
@@ -78,7 +82,10 @@ class KioskSettings {
     this.customerPrinter = AdapterConfig.demo,
     this.kitchenPrinter = AdapterConfig.none,
     this.adminPin = '1234',
+    this.palette = 'classic',
   });
+
+  ColorPalette get colors => ColorPalette.byId(palette);
 
   /// Stock is only enforced in production mode.
   bool get enforcesStock => stockTracking && !demoMode;
@@ -99,6 +106,9 @@ class KioskSettings {
       errors.add('The maximum quantity per line must be at least 1.');
     }
     if (adminPin.length < 4) errors.add('The admin PIN needs 4+ characters.');
+    if (!ColorPalette.presets.any((p) => p.id == palette)) {
+      errors.add('Unknown colour palette "$palette".');
+    }
     for (final issue in flow.validate()) {
       if (issue.level == FlowIssueLevel.error) errors.add(issue.message);
     }
@@ -155,6 +165,7 @@ class KioskSettings {
         d.kitchenPrinter,
       ),
       adminPin: json['adminPin'] as String? ?? d.adminPin,
+      palette: json['palette'] as String? ?? d.palette,
     );
   }
 
@@ -183,5 +194,6 @@ class KioskSettings {
     'idleTimeoutSeconds': idleTimeoutSeconds,
     'maxQuantityPerLine': maxQuantityPerLine,
     'counterFallback': counterFallback,
+    'palette': palette,
   };
 }

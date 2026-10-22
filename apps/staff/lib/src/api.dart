@@ -103,6 +103,10 @@ class StaffApi {
   Future<KioskSettings> settings() async =>
       KioskSettings.fromJson(await _map('GET', '/api/admin/settings'));
 
+  /// Public settings, readable without the PIN (palette, venue name).
+  Future<KioskSettings> publicSettings() async =>
+      KioskSettings.fromJson(await _map('GET', '/api/settings'));
+
   /// Saves a partial or full settings object; the server validates it.
   Future<KioskSettings> saveSettings(Map<String, Object?> patch) async =>
       KioskSettings.fromJson(

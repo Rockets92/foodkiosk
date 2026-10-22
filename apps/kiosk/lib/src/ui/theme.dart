@@ -1,18 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:kiosk_core/kiosk_core.dart';
 
-/// Design tokens of the kiosk. The brand is a placeholder: change the
-/// colours here (and the logo served by the server) to restyle a venue.
+/// Design tokens of the kiosk. Brand colours come from the [ColorPalette]
+/// chosen in the staff settings (see [K.palette]); text, cards and status
+/// colours are shared by every palette.
 abstract final class K {
-  static const red = Color(0xFFD62300);
-  static const redDark = Color(0xFFA81B00);
-  static const yellow = Color(0xFFFFC72C);
+  static ColorPalette palette = ColorPalette.fallback;
+
+  static Color get primary => Color(palette.primary);
+  static Color get primaryDark => Color(palette.primaryDark);
+  static Color get accent => Color(palette.accent);
+  static Color get background => Color(palette.background);
+  static Color get line => Color(palette.line);
+
+  /// Light wash of [primary], behind selected options and soft badges.
+  static Color get primarySoft =>
+      Color.alphaBlend(primary.withValues(alpha: 0.11), Colors.white);
+
+  /// Fainter wash of [primary], for large selected surfaces.
+  static Color get primaryFaint =>
+      Color.alphaBlend(primary.withValues(alpha: 0.05), Colors.white);
+
+  /// Light wash of [accent].
+  static Color get accentSoft =>
+      Color.alphaBlend(accent.withValues(alpha: 0.28), Colors.white);
+
   static const ink = Color(0xFF1B1B1F);
   static const inkSoft = Color(0xFF5E5E66);
   static const muted = Color(0xFF9A9AA3);
-  static const background = Color(0xFFF7F4EF);
   static const card = Colors.white;
-  static const line = Color(0xFFECE7DF);
   static const success = Color(0xFF1FA463);
+
+  /// Errors keep the same red whatever the palette.
+  static const danger = Color(0xFFD62300);
+  static const dangerDark = Color(0xFFA81B00);
+  static const dangerSoft = Color(0xFFFFE9E5);
 
   static const radius = 28.0;
   static const radiusSmall = 18.0;
@@ -43,18 +66,47 @@ abstract final class K {
   static Color tintFor(String id) =>
       tints[id.codeUnits.fold<int>(0, (a, b) => a + b) % tints.length];
 
-  static const heroGradient = LinearGradient(
+  static LinearGradient get heroGradient => LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFE8331C), red, Color(0xFFB81D00)],
+    colors: [Color(palette.primaryLight), primary, primaryDark],
   );
 }
 
-ThemeData kioskTheme() {
+/// Repaints the bundled SVG artwork in the current palette.
+class PaletteColorMapper extends ColorMapper {
+  final ColorPalette palette;
+  const PaletteColorMapper(this.palette);
+
+  @override
+  Color substitute(String? id, String element, String attribute, Color c) =>
+      Color(palette.recolor(c.toARGB32()));
+
+  @override
+  bool operator ==(Object other) =>
+      other is PaletteColorMapper && other.palette.id == palette.id;
+
+  @override
+  int get hashCode => palette.id.hashCode;
+}
+
+/// Rebuilds every widget below [context], const ones included, so they
+/// read the new palette tokens while keeping their state.
+void rebuildAll(BuildContext context) {
+  void visit(Element e) {
+    e.markNeedsBuild();
+    e.visitChildren(visit);
+  }
+
+  (context as Element).visitChildren(visit);
+}
+
+ThemeData kioskTheme(ColorPalette palette) {
+  K.palette = palette;
   final scheme = ColorScheme.fromSeed(
-    seedColor: K.red,
-    primary: K.red,
-    secondary: K.yellow,
+    seedColor: K.primary,
+    primary: K.primary,
+    secondary: K.accent,
     surface: K.background,
   );
   final base = ThemeData(

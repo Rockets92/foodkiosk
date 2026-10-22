@@ -17,7 +17,7 @@ class OfflineScreen extends StatelessWidget {
     return Scaffold(
       key: const ValueKey('offline'),
       body: DecoratedBox(
-        decoration: const BoxDecoration(gradient: K.heroGradient),
+        decoration: BoxDecoration(gradient: K.heroGradient),
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,

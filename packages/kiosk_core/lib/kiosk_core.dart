@@ -11,4 +11,5 @@ export 'src/localized_text.dart';
 export 'src/menu.dart';
 export 'src/money.dart';
 export 'src/order.dart';
+export 'src/palette.dart';
 export 'src/settings.dart';

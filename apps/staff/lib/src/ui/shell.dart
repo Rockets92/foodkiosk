@@ -139,7 +139,12 @@ class _Rail extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 16),
-            ServerImage('/media/placeholder/logo.svg', size: 56, radius: 28),
+            ServerImage(
+              '/media/placeholder/logo.svg',
+              size: 56,
+              radius: 28,
+              recolor: true,
+            ),
             const SizedBox(height: 6),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -157,7 +162,7 @@ class _Rail extends StatelessWidget {
             ),
             if (demo) ...[
               const SizedBox(height: 6),
-              const Pill('DEMO', color: S.yellow),
+              Pill('DEMO', color: S.accent),
             ],
             const SizedBox(height: 14),
             Expanded(
@@ -203,7 +208,7 @@ class _RailItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       child: Material(
-        color: selected ? S.red : Colors.transparent,
+        color: selected ? S.navSelected : Colors.transparent,
         borderRadius: BorderRadius.circular(18),
         child: InkWell(
           key: ValueKey('nav-${section.name}'),
@@ -216,7 +221,7 @@ class _RailItem extends StatelessWidget {
               children: [
                 Icon(
                   section.icon,
-                  color: selected ? Colors.white : Colors.white60,
+                  color: selected ? S.onNavSelected : Colors.white60,
                   size: 26,
                 ),
                 const SizedBox(height: 4),
@@ -224,7 +229,7 @@ class _RailItem extends StatelessWidget {
                   section.label,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: selected ? Colors.white : Colors.white60,
+                    color: selected ? S.onNavSelected : Colors.white60,
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
                   ),

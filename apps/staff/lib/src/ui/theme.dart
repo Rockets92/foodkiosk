@@ -1,16 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:kiosk_core/kiosk_core.dart';
 
-/// Design tokens of the staff app, sharing the kiosk's placeholder brand.
+/// Design tokens of the staff app. Brand colours follow the venue's
+/// [ColorPalette], the same one the kiosk uses (see [S.palette]).
 abstract final class S {
-  static const red = Color(0xFFD62300);
-  static const yellow = Color(0xFFFFC72C);
+  static ColorPalette palette = ColorPalette.fallback;
+
+  static Color get primary => Color(palette.primary);
+  static Color get primaryDark => Color(palette.primaryDark);
+  static Color get accent => Color(palette.accent);
+  static Color get background => Color(palette.background);
+  static Color get line => Color(palette.line);
+
+  /// Highlight of the selected item on the dark side bar: the primary
+  /// colour, or the accent when the primary is too dark to stand out.
+  static Color get navSelected =>
+      primary.computeLuminance() < 0.04 ? accent : primary;
+  static Color get onNavSelected =>
+      primary.computeLuminance() < 0.04 ? ink : Colors.white;
+
   static const ink = Color(0xFF1B1B1F);
   static const inkSoft = Color(0xFF5E5E66);
   static const muted = Color(0xFF9A9AA3);
-  static const background = Color(0xFFF5F2EC);
-  static const line = Color(0xFFE8E2D8);
   static const success = Color(0xFF1FA463);
   static const warning = Color(0xFFF29A00);
+
+  /// Errors, cancellations and late orders: red whatever the palette.
+  static const danger = Color(0xFFD62300);
   static const info = Color(0xFF2F6FEB);
   static const nav = Color(0xFF16161A);
 
@@ -23,11 +40,41 @@ abstract final class S {
   ];
 }
 
-ThemeData staffTheme() {
+/// Repaints the placeholder logo in the current palette.
+class PaletteColorMapper extends ColorMapper {
+  final ColorPalette palette;
+  const PaletteColorMapper(this.palette);
+
+  @override
+  Color substitute(String? id, String element, String attribute, Color c) =>
+      Color(palette.recolor(c.toARGB32()));
+
+  @override
+  bool operator ==(Object other) =>
+      other is PaletteColorMapper && other.palette.id == palette.id;
+
+  @override
+  int get hashCode => palette.id.hashCode;
+}
+
+/// Rebuilds every widget below [context], const ones included, so they
+/// read the new palette tokens while keeping their state (open section,
+/// selected order...).
+void rebuildAll(BuildContext context) {
+  void visit(Element e) {
+    e.markNeedsBuild();
+    e.visitChildren(visit);
+  }
+
+  (context as Element).visitChildren(visit);
+}
+
+ThemeData staffTheme(ColorPalette palette) {
+  S.palette = palette;
   final scheme = ColorScheme.fromSeed(
-    seedColor: S.red,
-    primary: S.red,
-    secondary: S.yellow,
+    seedColor: S.primary,
+    primary: S.primary,
+    secondary: S.accent,
     surface: Colors.white,
   );
   final base = ThemeData(
@@ -45,11 +92,11 @@ ThemeData staffTheme() {
       fillColor: Colors.white,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: S.line),
+        borderSide: BorderSide(color: S.line),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: S.line),
+        borderSide: BorderSide(color: S.line),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
@@ -69,7 +116,7 @@ ThemeData staffTheme() {
         minimumSize: const Size(0, 52),
         padding: const EdgeInsets.symmetric(horizontal: 22),
         foregroundColor: S.ink,
-        side: const BorderSide(color: S.line, width: 1.5),
+        side: BorderSide(color: S.line, width: 1.5),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         textStyle: const TextStyle(
           fontFamily: 'Poppins',
@@ -86,7 +133,7 @@ ThemeData staffTheme() {
     ),
     chipTheme: base.chipTheme.copyWith(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      side: const BorderSide(color: S.line),
+      side: BorderSide(color: S.line),
     ),
     snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
   );
