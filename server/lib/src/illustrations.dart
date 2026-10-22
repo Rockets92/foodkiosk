@@ -113,7 +113,7 @@ final _doubleBurger = _svg(
 
 final _chickenBurger = _burger(
   filling:
-      '<path d="M60 254 q14 -9 28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 q14 4 14 20 q0 16 -14 20 q-14 9 -28 0 t-28 0 t-28 0 t-28 0 t-28 0 t-28 0 t-28 0 t-28 0 t-28 0 t-28 0 q-14 -4 -14 -20 q0 -16 14 -20z" fill="url(#crispy)"/>'
+      '<path d="M70 254 q13 -9 26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 q12 4 12 20 q0 16 -12 20 q-13 9 -26 0 t-26 0 t-26 0 t-26 0 t-26 0 t-26 0 t-26 0 t-26 0 t-26 0 t-26 0 q-12 -4 -12 -20 q0 -16 12 -20z" fill="url(#crispy)"/>'
       '<circle cx="110" cy="276" r="3" fill="#A65A10"/><circle cx="170" cy="284" r="3" fill="#A65A10"/><circle cx="230" cy="274" r="3" fill="#A65A10"/><circle cx="290" cy="284" r="3" fill="#A65A10"/>'
       '<path d="M70 248 h260" stroke="#FFF7E0" stroke-width="10" stroke-linecap="round"/>'
       '${_lettuce(228)}',
@@ -160,16 +160,17 @@ final _fries = _carton(
 final _wedges = _carton(
   '#2F6B3A',
   [
-    for (final (x, y, rot) in [
-      (130, 150, -30),
-      (170, 120, -10),
-      (210, 118, 12),
-      (250, 140, 30),
-      (190, 160, 0),
-      (150, 170, -15),
-      (232, 168, 18),
+    for (final (x, top, rot) in [
+      (124, 130, -14),
+      (244, 130, 14),
+      (152, 108, -7),
+      (216, 108, 7),
+      (184, 96, 0),
+      (136, 146, -9),
+      (232, 146, 9),
     ])
-      '<path d="M$x $y l26 -50 q14 8 12 30 l-14 40 q-20 0 -24 -20z" fill="#D9932E" stroke="#9B5A14" stroke-width="3" transform="rotate($rot $x $y)"/>',
+      '<path d="M$x 220 V${top + 26} q0 -18 16 -26 q16 8 16 26 V220z" fill="#E9B04A" stroke="#9B5A14" stroke-width="3" transform="rotate($rot ${x + 16} 220)"/>'
+          '<path d="M${x + 26} 214 V${top + 28} q0 -12 -6 -20" stroke="#B8701E" stroke-width="6" fill="none" stroke-linecap="round" transform="rotate($rot ${x + 16} 220)"/>',
   ].join(),
 );
 
@@ -252,9 +253,10 @@ final _beer = _svg(
 final _sundae = _svg(
   '<path d="M120 236 h160 l-30 110 h-100z" fill="#FFFFFF" stroke="#E2E2E2" stroke-width="4"/>'
   '<path d="M120 236 h160 l-6 22 h-148z" fill="#E8331C"/>'
-  '<path d="M128 236 q-10 -40 30 -46 q-6 -40 42 -44 q-4 -46 40 -46 q-14 30 10 50 q34 6 24 40 q30 10 14 46z" fill="#FFF8EC" stroke="#EADFC8" stroke-width="3"/>'
-  '<path d="M150 196 q30 22 52 -4 q16 26 44 2 q10 18 20 6 l2 26 q-20 18 -40 2 q-24 22 -52 0 q-20 16 -34 -4z" fill="url(#choc)"/>'
-  '<circle cx="232" cy="120" r="14" fill="#C21807"/><path d="M232 106 q6 -20 20 -24" stroke="#4E7A2B" stroke-width="4" fill="none"/>',
+  '<path d="M128 236 q-14 -38 26 -46 q-4 -40 46 -42 q50 2 46 42 q40 8 26 46z" fill="#FFF8EC" stroke="#EADFC8" stroke-width="3"/>'
+  '<path d="M170 152 q0 -36 30 -48 q30 12 30 48z" fill="#FFF8EC" stroke="#EADFC8" stroke-width="3"/>'
+  '<path d="M146 200 q27 20 54 0 q27 20 54 0 l2 26 q-28 18 -56 2 q-28 16 -56 -2z" fill="url(#choc)"/>'
+  '<circle cx="200" cy="98" r="14" fill="#C21807"/><path d="M200 84 q6 -20 20 -24" stroke="#4E7A2B" stroke-width="4" fill="none"/>',
 );
 
 final _brownie = _svg(
@@ -265,7 +267,7 @@ final _brownie = _svg(
   '${[
     for (final (x, y) in [(150, 222), (200, 206), (245, 226), (190, 246), (230, 252), (165, 248)]) '<ellipse cx="$x" cy="$y" rx="10" ry="6" fill="#D9B48A"/>',
   ].join()}'
-  '<path d="M150 180 q10 -30 40 -26 q30 -10 40 18" fill="#FFF8EC"/>',
+  '<path d="M164 222 q-4 -26 20 -30 q4 -20 16 -26 q12 6 16 26 q24 4 20 30 q-36 12 -72 0z" fill="#FFF8EC" stroke="#EADFC8" stroke-width="3"/>',
 );
 
 // ---------------------------------------------------------------------------
@@ -296,11 +298,11 @@ final _egg = _svg(
 final _jalapeno = _svg(
   [
     for (final (x, y) in [
-      (140, 200),
-      (230, 180),
-      (190, 260),
-      (270, 260),
-      (120, 280),
+      (160, 190),
+      (240, 190),
+      (120, 270),
+      (200, 260),
+      (280, 270),
     ])
       '<circle cx="$x" cy="$y" r="40" fill="#4E9F33"/><circle cx="$x" cy="$y" r="26" fill="#9BD16B"/>'
           '<circle cx="${x - 8}" cy="${y - 4}" r="4" fill="#F6F2D0"/><circle cx="${x + 8}" cy="${y + 2}" r="4" fill="#F6F2D0"/><circle cx="$x" cy="${y + 10}" r="4" fill="#F6F2D0"/>',
