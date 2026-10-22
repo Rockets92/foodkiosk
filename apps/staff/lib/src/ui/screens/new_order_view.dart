@@ -135,7 +135,10 @@ class _NewOrderViewState extends State<NewOrderView> {
         _code.clear();
       }
     });
-    if (found != null) showMessage(context, 'Codice ${found.code} applicato');
+    // When the order does not qualify yet the box says why.
+    if (found != null && (_discount?.ok ?? false)) {
+      showMessage(context, 'Codice ${found.code} applicato');
+    }
   }
 
   List<Category> _categories(Menu menu, ServiceMode mode) => [

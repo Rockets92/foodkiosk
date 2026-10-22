@@ -34,7 +34,7 @@ class ScannerListener extends StatefulWidget {
 
 class _ScannerListenerState extends State<ScannerListener> {
   final _buffer = StringBuffer();
-  DateTime _last = DateTime.fromMillisecondsSinceEpoch(0);
+  Duration? _last;
   Timer? _end;
 
   @override
@@ -61,8 +61,15 @@ class _ScannerListenerState extends State<ScannerListener> {
     if (!widget.enabled || event is KeyUpEvent || _typingInField) {
       return false;
     }
-    final now = DateTime.now();
-    if (now.difference(_last) > ScannerListener.maxGap) _buffer.clear();
+    // When the key was pressed, not when we got to it: a busy frame can
+    // hold back a burst of reader keys.
+    final now = event.timeStamp > Duration.zero
+        ? event.timeStamp
+        : Duration(microseconds: DateTime.now().microsecondsSinceEpoch);
+    final last = _last;
+    if (last == null || (now - last).abs() > ScannerListener.maxGap) {
+      _buffer.clear();
+    }
     _last = now;
     _end?.cancel();
     final key = event.logicalKey;

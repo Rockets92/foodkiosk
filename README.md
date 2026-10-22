@@ -113,6 +113,8 @@ programma Windows) con accesso tramite PIN staff e una barra laterale:
   per un monitor dedicato.
 - **Menu**: prodotti (foto caricabili, prezzi, IVA, allergeni, etichette
   "Novità", varianti, disponibilità), categorie e gruppi di varianti.
+- **Sconti**: codici sconto (vedi sotto), con utilizzi, stato, QR code e
+  codice a barre da stampare.
 - **Impostazioni**: modalità demo, lingue, "mangio qui / porto via",
   flusso dell'ordine con verifica immediata delle combinazioni, dispositivi
   (POS, registratore telematico, stampanti) e PIN.
@@ -221,6 +223,43 @@ Nessun vicolo cieco:
 - in cassa si può segnare pagato senza emettere il documento fiscale
   (`issueFiscal: false`) quando lo ha già emesso il registratore di cassa.
 
+## Codici sconto
+
+Tre tipi di codice, gestiti da **Staff → Sconti**:
+
+- **Percentuale** su tutto l'ordine (es. `BENVENUTO10`, 10%);
+- **Importo fisso** (es. `MENO3`, 3 €), mai oltre il totale;
+- **Prodotto omaggio**: il prezzo base di una unità di un prodotto è
+  gratis (le aggiunte a pagamento restano). Se il prodotto non chiede
+  scelte il totem lo mette da solo nel carrello, altrimenti invita il
+  cliente ad aggiungerlo.
+
+Per ogni codice: spesa minima, **limite di utilizzi** (1 = monouso, vuoto =
+illimitato), periodo di validità, testo per il cliente, nota interna, attivo
+o no. Un uso si conta quando l'ordine viene creato e torna disponibile se
+l'ordine è annullato. Il menu demo crea `BENVENUTO10`, `MENO3` (spesa minima
+15 €) e `PATATINE` (patatine in omaggio).
+
+**Modulare** come il resto (Staff → Impostazioni → Codici sconto):
+interruttore generale e, indipendenti tra loro,
+
+| Opzione | Effetto |
+| --- | --- |
+| Tastiera sul totem | Nel carrello e nell'intestazione del menu "Hai un codice sconto?" apre una tastiera a schermo |
+| Lettore QR / barcode | Per totem con lettore integrato: il coupon si applica appena scansionato, anche dalla schermata di attesa (che parte da sola) |
+| In cassa | Il cassiere applica i codici nel nuovo ordine, scrivendoli o con un lettore collegato al PC |
+
+Il lettore va usato in modalità **tastiera USB (HID)** con invio dopo il
+codice, l'impostazione di fabbrica di quasi tutti i modelli: nessun driver.
+L'app distingue il lettore dalla digitazione di una persona dalla velocità
+dei tasti. Un QR code può contenere il codice o un link con `?code=CODICE`.
+Nelle impostazioni c'è un campo per provare il lettore.
+
+Lo sconto compare sullo scontrino (subtotale e riga sconto), nel
+riepilogo del giorno, nell'IVA (ripartita per aliquota) e va al
+registratore telematico Epson come sconto sul subtotale. Contro i
+tentativi a caso il totem blocca per un minuto chi sbaglia 10 codici.
+
 ## Adattatori
 
 POS, stampanti e dispositivo fiscale sono componenti intercambiabili
@@ -270,7 +309,8 @@ Pubbliche (usate dal totem):
 | GET | `/api/menu` | Menu visibile sul totem |
 | GET | `/api/allergens` | Elenco allergeni e etichette dietetiche tradotte |
 | GET | `/api/pickup` | Numeri in preparazione e pronti (schermo ritiro) |
-| POST | `/api/orders` | Crea un ordine (i prezzi li calcola sempre il server) |
+| POST | `/api/discounts/check` | Verifica un codice sconto (`code`) |
+| POST | `/api/orders` | Crea un ordine (i prezzi li calcola sempre il server; `discountCode` facoltativo) |
 | GET | `/api/orders/<id>` | Stato dell'ordine |
 | POST | `/api/orders/<id>/pay` | Pagamento sul totem |
 | POST | `/api/orders/<id>/switch-to-counter` | Dopo un pagamento rifiutato, paga in cassa |
@@ -296,11 +336,13 @@ Staff e gestione (header `X-Staff-Pin`):
 | GET | `/api/admin/flow/presets`, `/api/admin/adapters` | Preset e adattatori disponibili |
 | POST | `/api/admin/flow/validate` | Verifica un flusso |
 | GET | `/api/admin/menu` | Menu completo, anche gli elementi disattivati |
+| GET/POST/PUT/DELETE | `/api/admin/discounts` | Gestione codici sconto; `POST .../<id>/reset-uses` azzera gli utilizzi |
+| POST | `/api/staff/discounts/check` | Verifica un codice in cassa |
 | POST/PUT/DELETE | `/api/admin/categories`, `/api/admin/products`, `/api/admin/modifier-groups` | Gestione menu |
 
 WebSocket `/ws` (con `?pin=` per ricevere anche gli ordini): eventi
 `order.created`, `order.updated`, `menu.updated`, `settings.updated`,
-`print.job`, `pickup.announce`.
+`discounts.updated`, `print.job`, `pickup.announce`.
 
 ## Sviluppo
 

@@ -80,6 +80,12 @@ Finché il lavoro non è unito a `main`, dopo il `git clone` esegui
 6. **Staff → Menu**: cambia un prezzo, carica una foto o segna un prodotto
    come esaurito: il totem si aggiorna subito.
 7. **Staff → Riepilogo**: incasso, ordini e prodotti più venduti del giorno.
+8. **Codici sconto**: nel carrello del totem tocca *Hai un codice sconto?* e
+   scrivi `BENVENUTO10` (10%), `MENO3` (3 € con almeno 15 € di spesa) o
+   `PATATINE` (patatine in omaggio). In **Staff → Sconti** crei i tuoi
+   codici, con limite di utilizzi e QR code; in **Impostazioni → Codici
+   sconto** scegli se il totem ha la tastiera, il lettore QR/barcode,
+   se si accettano in cassa, o li spegni del tutto.
 
 Suggerimento: il totem è pensato per uno schermo verticale. Su un PC
 normale usa **Food Kiosk Totem in finestra**; nel browser (Strada 2) puoi
