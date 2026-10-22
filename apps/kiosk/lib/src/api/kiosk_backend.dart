@@ -33,6 +33,9 @@ abstract class KioskBackend {
   Future<Order> switchToCounter(String orderId);
   Future<Order> cancel(String orderId);
 
+  /// Looks up a discount code typed or scanned by the customer.
+  Future<DiscountCode> checkDiscount(String code);
+
   /// Checks a staff PIN against the server (for the hidden staff menu).
   /// Whether the server accepts [pin]; null when it cannot be reached.
   Future<bool?> verifyStaffPin(String pin);
@@ -131,6 +134,12 @@ class HttpKioskBackend extends KioskBackend {
   @override
   Future<Order> cancel(String orderId) async =>
       Order.fromJson(await _send('POST', '/api/orders/$orderId/cancel'));
+
+  @override
+  Future<DiscountCode> checkDiscount(String code) async =>
+      DiscountCode.fromJson(
+        await _send('POST', '/api/discounts/check', body: {'code': code}),
+      );
 
   @override
   Future<bool?> verifyStaffPin(String pin) async {

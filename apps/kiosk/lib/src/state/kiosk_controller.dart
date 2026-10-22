@@ -36,6 +36,19 @@ class KioskController extends ChangeNotifier {
   /// Key of the error message to show, see `i18n.dart`.
   String? errorKey;
 
+  /// The discount code applied to the cart, priced again on every change.
+  DiscountCode? coupon;
+
+  /// True while a code is being checked with the server.
+  bool checkingCoupon = false;
+
+  /// Why the last code typed or scanned was refused (`i18n.dart` key).
+  String? couponErrorKey;
+
+  /// Bumped on every code typed or scanned, so the UI can celebrate a
+  /// success or shake on a refusal even when the same code comes twice.
+  int couponAttempt = 0;
+
   StreamSubscription<ServerEvent>? _events;
   Timer? _retry;
 
@@ -64,6 +77,7 @@ class KioskController extends ChangeNotifier {
       }
       _dropUnavailableFromCart();
       _ensureCategory();
+      if (!discountsEnabled) coupon = null;
     } on BackendException {
       if (loadState != LoadState.ready) loadState = LoadState.offline;
       _retry = Timer(const Duration(seconds: 5), reload);
@@ -168,6 +182,117 @@ class KioskController extends ChangeNotifier {
 
   Cents get cartTotal => cart.fold(0, (s, l) => s + lineTotal(l));
 
+  // ---------------------------------------------------------------------
+  // Discount codes
+
+  bool get discountsEnabled => settings.discounts.onKiosk;
+
+  /// The coupon applied to the current cart; `problem` tells why it does
+  /// not apply (yet), e.g. the free product is not in the cart.
+  DiscountResult? get couponResult {
+    final c = coupon;
+    if (c == null) return null;
+    return c.evaluate([
+      for (final l in cart)
+        if (menu.product(l.productId) case final p?)
+          (
+            productId: l.productId,
+            quantity: l.quantity,
+            unitBaseCents: p.priceCents,
+            totalCents: lineTotal(l),
+          ),
+    ]);
+  }
+
+  Cents get discountCents {
+    final r = couponResult;
+    return r != null && r.ok ? r.amountCents : 0;
+  }
+
+  /// What the customer pays: the cart minus the discount.
+  Cents get payableTotal => cartTotal - discountCents;
+
+  /// The product a "free product" coupon gives, if any.
+  Product? get couponProduct {
+    final c = coupon;
+    if (c == null || c.type != DiscountType.freeProduct) return null;
+    return menu.product(c.productId ?? '');
+  }
+
+  /// Checks [raw] with the server and applies it. A free product that
+  /// needs no choices goes straight into the cart. Returns success.
+  Future<bool> applyCoupon(String raw, {bool scanned = false}) async {
+    if (!discountsEnabled || checkingCoupon) return false;
+    final code = DiscountCode.normalize(raw);
+    if (code.isEmpty) return false;
+    // Scanning a coupon on the attract screen starts the order.
+    if (step == KioskStep.attract) start();
+    checkingCoupon = true;
+    couponErrorKey = null;
+    notifyListeners();
+    try {
+      final found = await backend.checkDiscount(code);
+      coupon = found;
+      final free = couponProduct;
+      if (free != null &&
+          !free.soldOut &&
+          !cart.any((l) => l.productId == free.id) &&
+          !free.modifierGroupIds
+              .map(menu.modifierGroup)
+              .any((g) => g != null && g.required)) {
+        cart = [
+          ...cart,
+          CartLine(productId: free.id, optionIds: defaultOptions(menu, free)),
+        ];
+      }
+    } on BackendException catch (e) {
+      couponErrorKey = _couponErrorKeyFor(e);
+    }
+    checkingCoupon = false;
+    couponAttempt++;
+    notifyListeners();
+    return couponErrorKey == null;
+  }
+
+  void removeCoupon() {
+    coupon = null;
+    couponErrorKey = null;
+    notifyListeners();
+  }
+
+  void clearCouponError() {
+    if (couponErrorKey == null) return;
+    couponErrorKey = null;
+    notifyListeners();
+  }
+
+  String _couponErrorKeyFor(BackendException e) {
+    if (e.isNetwork) return 'errorNetwork';
+    return switch (e.code) {
+      'codeNotFound' => 'couponNotFound',
+      'codeExpired' => 'couponExpired',
+      'codeNotYetValid' => 'couponNotYetValid',
+      'codeExhausted' => 'couponExhausted',
+      'codeDisabled' => 'couponNotFound',
+      'tooManyAttempts' => 'couponTooMany',
+      'discountsDisabled' => 'couponUnavailable',
+      'minOrderNotReached' => 'couponMinOrder',
+      'freeProductMissing' => 'couponFreeMissing',
+      _ => 'errorGeneric',
+    };
+  }
+
+  static const _couponErrors = {
+    'codeNotFound',
+    'codeExpired',
+    'codeNotYetValid',
+    'codeExhausted',
+    'codeDisabled',
+    'discountsDisabled',
+    'minOrderNotReached',
+    'freeProductMissing',
+  };
+
   int get maxQuantity => settings.maxQuantityPerLine;
 
   void addToCart(CartLine line) {
@@ -223,6 +348,7 @@ class KioskController extends ChangeNotifier {
           language: language,
           lines: [for (final l in cart) l.toRequest()],
           paymentChoice: paymentChoice,
+          discountCode: couponResult?.ok ?? false ? coupon!.code : null,
         ),
       );
       busy = false;
@@ -237,6 +363,11 @@ class KioskController extends ChangeNotifier {
     } on BackendException catch (e) {
       busy = false;
       errorKey = _errorKeyFor(e);
+      if (_couponErrors.contains(e.code)) {
+        // The code ran out (or changed) since it was applied.
+        coupon = null;
+        errorKey = 'couponNoLongerValid';
+      }
       if (e.code == 'soldOut' ||
           e.code == 'insufficientStock' ||
           e.code == 'productUnavailable') {
@@ -336,6 +467,9 @@ class KioskController extends ChangeNotifier {
     order = null;
     busy = false;
     errorKey = null;
+    coupon = null;
+    checkingCoupon = false;
+    couponErrorKey = null;
     selectedCategoryId = null;
     _ensureCategory();
     notifyListeners();

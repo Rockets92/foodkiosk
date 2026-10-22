@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kiosk_app/src/state/cart.dart';
 import 'package:kiosk_app/src/state/kiosk_controller.dart';
@@ -198,5 +199,159 @@ void main() {
     expect(k.cartTotal, (990 + 80) * 2 + 990);
     k.setQuantity(1, 0);
     expect(k.cart, hasLength(1));
+  });
+
+  group('discount codes', () {
+    Future<void> type(WidgetTester tester, String code) async {
+      for (final c in code.split('')) {
+        await tester.tap(find.byKey(ValueKey('kb-$c')));
+        await tester.pump();
+      }
+    }
+
+    testWidgets('a code typed on the on-screen keyboard discounts the order', (
+      tester,
+    ) async {
+      final backend = FakeBackend();
+      final k = await pumpKiosk(tester, backend);
+      await goToMenu(tester);
+      k.addToCart(const CartLine(productId: 'cola', quantity: 5));
+      await tester.pump();
+      await tapKey(tester, 'view-order');
+
+      await tapKey(tester, 'coupon-open');
+      // Wrong code first: the field shakes and says why.
+      await type(tester, 'NOPE');
+      await tapKey(tester, 'coupon-apply');
+      expect(find.byKey(const ValueKey('coupon-error')), findsOneWidget);
+      expect(find.textContaining('non valido'), findsOneWidget);
+
+      for (var i = 0; i < 4; i++) {
+        await tester.tap(find.byKey(const ValueKey('kb-back')));
+      }
+      await type(tester, 'SCONTO10');
+      await tester.tap(find.byKey(const ValueKey('coupon-apply')));
+      await settle(tester);
+      expect(find.byKey(const ValueKey('coupon-success')), findsOneWidget);
+      await tester.pump(const Duration(seconds: 2));
+      await settle(tester);
+
+      expect(k.discountCents, 140);
+      expect(find.byKey(const ValueKey('coupon-applied')), findsOneWidget);
+      expect(find.text('-1,40 €'), findsWidgets);
+      expect(find.text('12,60 €'), findsWidgets);
+
+      await tapKey(tester, 'submit-default');
+      expect(backend.requests.single.discountCode, 'SCONTO10');
+      expect(k.order!.totalCents, 1260);
+    });
+
+    testWidgets('a free product goes into the cart with its badge', (
+      tester,
+    ) async {
+      final k = await pumpKiosk(tester, FakeBackend());
+      await goToMenu(tester);
+      k.addToCart(const CartLine(productId: 'burger'));
+      await tester.pump();
+      await tapKey(tester, 'view-order');
+      await k.applyCoupon('colagratis');
+      await settle(tester);
+      expect(k.cart.map((l) => l.productId), ['burger', 'cola']);
+      expect(k.discountCents, 280);
+      expect(find.byKey(const ValueKey('free-badge')), findsOneWidget);
+
+      // Removing the product keeps the code but explains what is missing.
+      k.setQuantity(1, 0);
+      await settle(tester);
+      expect(k.discountCents, 0);
+      expect(find.textContaining('per averlo in omaggio'), findsOneWidget);
+      await tapKey(tester, 'coupon-add-free');
+      expect(k.discountCents, 280);
+    });
+
+    testWidgets('a minimum order is explained until reached', (tester) async {
+      final k = await pumpKiosk(tester, FakeBackend());
+      await goToMenu(tester);
+      k.addToCart(const CartLine(productId: 'burger'));
+      await tester.pump();
+      await tapKey(tester, 'view-order');
+      await k.applyCoupon('MENO5');
+      await settle(tester);
+      expect(find.textContaining('aggiungi ancora 13,50'), findsOneWidget);
+      k.setQuantity(0, 4);
+      await settle(tester);
+      expect(k.discountCents, 500);
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('scanning a coupon on the attract screen starts the order', (
+      tester,
+    ) async {
+      final k = await pumpKiosk(
+        tester,
+        FakeBackend(
+          settings: const KioskSettings(
+            discounts: DiscountSettings(scanner: true, manualEntry: false),
+          ),
+        ),
+      );
+      expect(find.byKey(const ValueKey('attract-scan')), findsOneWidget);
+      for (final c in 'SCONTO10'.split('')) {
+        await tester.sendKeyEvent(
+          LogicalKeyboardKey(c.toLowerCase().codeUnitAt(0)),
+          character: c,
+        );
+      }
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await settle(tester);
+      expect(k.step, isNot(KioskStep.attract));
+      expect(k.coupon?.code, 'SCONTO10');
+      expect(find.byKey(const ValueKey('coupon-toast')), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4));
+    });
+
+    testWidgets('slow typing is not taken for a scan', (tester) async {
+      final k = await pumpKiosk(
+        tester,
+        FakeBackend(
+          settings: const KioskSettings(
+            discounts: DiscountSettings(scanner: true),
+          ),
+        ),
+      );
+      for (final c in 'SCONTO10'.split('')) {
+        await tester.sendKeyEvent(
+          LogicalKeyboardKey(c.toLowerCase().codeUnitAt(0)),
+          character: c,
+        );
+        await tester.runAsync(
+          () => Future.delayed(const Duration(milliseconds: 90)),
+        );
+      }
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(k.coupon, isNull);
+      expect(k.step, KioskStep.attract);
+    });
+
+    testWidgets('with codes off nothing about coupons is shown', (
+      tester,
+    ) async {
+      final k = await pumpKiosk(
+        tester,
+        FakeBackend(
+          settings: const KioskSettings(
+            discounts: DiscountSettings(enabled: false),
+          ),
+        ),
+      );
+      await goToMenu(tester);
+      expect(find.byKey(const ValueKey('menu-coupon')), findsNothing);
+      k.addToCart(const CartLine(productId: 'cola'));
+      await tester.pump();
+      await tapKey(tester, 'view-order');
+      expect(find.byKey(const ValueKey('coupon-open')), findsNothing);
+      expect(await k.applyCoupon('SCONTO10'), isFalse);
+    });
   });
 }

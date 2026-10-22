@@ -8,6 +8,7 @@ import '../theme.dart';
 import '../widgets/allergens.dart';
 import '../widgets/cart_flight.dart';
 import '../widgets/common.dart';
+import '../widgets/coupon.dart';
 import '../widgets/net_image.dart';
 import '../widgets/pressable.dart';
 import 'product_screen.dart';
@@ -151,8 +152,56 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
+          if (k.discountsEnabled) ...[
+            const _CouponButton(),
+            const SizedBox(width: 14),
+          ],
           const LanguageSwitcher(),
         ],
+      ),
+    );
+  }
+}
+
+/// "Coupon" pill in the header: opens the code sheet, or shows the code
+/// already applied.
+class _CouponButton extends StatelessWidget {
+  const _CouponButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final k = context.kiosk;
+    final applied = k.coupon != null;
+    return Pressable(
+      key: const ValueKey('menu-coupon'),
+      onTap: applied ? k.openCart : () => CouponSheet.show(context),
+      child: AnimatedContainer(
+        duration: K.medium,
+        padding: const EdgeInsets.fromLTRB(14, 12, 20, 12),
+        decoration: BoxDecoration(
+          color: applied ? const Color(0xFF14A05A) : Colors.white,
+          borderRadius: BorderRadius.circular(40),
+          boxShadow: K.shadow,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              applied ? Icons.verified_rounded : Icons.local_offer_rounded,
+              color: applied ? Colors.white : K.red,
+              size: 26,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              applied ? k.coupon!.code : 'Coupon',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: applied ? Colors.white : K.ink,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -764,16 +813,45 @@ class _OrderBarState extends State<OrderBar>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text(
-                                  t('yourOrder'),
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      t('yourOrder'),
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    if (k.discountCents > 0) ...[
+                                      const SizedBox(width: 10),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF14A05A),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          '-${context.money(k.discountCents)}',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ).animate().scale(
+                                        curve: Curves.easeOutBack,
+                                      ),
+                                    ],
+                                  ],
                                 ),
                                 AnimatedAmount(
-                                  context.money(k.cartTotal),
+                                  context.money(k.payableTotal),
                                   key: const ValueKey('cart-total'),
                                   style: const TextStyle(
                                     color: Colors.white,

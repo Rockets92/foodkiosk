@@ -11,7 +11,9 @@ import 'screens/payment_screen.dart';
 import 'screens/start_screen.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
+import 'widgets/coupon.dart';
 import 'widgets/idle_watcher.dart';
+import 'widgets/scanner_listener.dart';
 import 'widgets/staff_corner.dart';
 
 final _theme = kioskTheme();
@@ -58,30 +60,45 @@ class _Shell extends StatelessWidget {
             KioskStep.payment => const PaymentScreen(),
             KioskStep.done => const DoneScreen(),
           };
-    return IdleWatcher(
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 450),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (child, anim) => FadeTransition(
-                opacity: anim,
-                child: ScaleTransition(
-                  scale: Tween(begin: 0.97, end: 1.0).animate(anim),
-                  child: child,
-                ),
-              ),
-              child: screen,
-            ),
-          ),
-          const DemoBadge(),
-          StaffCorner(onServerChanged: onServerChanged),
-        ],
-      ),
+    final scanning =
+        k.loadState == LoadState.ready &&
+        k.discountsEnabled &&
+        k.settings.discounts.scanner &&
+        const {
+          KioskStep.attract,
+          KioskStep.start,
+          KioskStep.menu,
+          KioskStep.cart,
+        }.contains(k.step);
+    return ScannerListener(
+      enabled: scanning,
+      onScan: (code) => k.applyCoupon(code, scanned: true),
+      child: IdleWatcher(child: _stack(screen)),
     );
   }
+
+  Widget _stack(Widget screen) => Stack(
+    children: [
+      Positioned.fill(
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 450),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, anim) => FadeTransition(
+            opacity: anim,
+            child: ScaleTransition(
+              scale: Tween(begin: 0.97, end: 1.0).animate(anim),
+              child: child,
+            ),
+          ),
+          child: screen,
+        ),
+      ),
+      const DemoBadge(),
+      const CouponToast(),
+      StaffCorner(onServerChanged: onServerChanged),
+    ],
+  );
 }
 
 /// The kiosk is designed for a 1080 px wide portrait screen and needs at
