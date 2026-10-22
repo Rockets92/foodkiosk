@@ -62,8 +62,8 @@ String _cheese(double y) =>
     '<path d="M56 $y h288 l-6 10 h-276z" fill="#FFD95A"/>';
 
 String _lettuce(double y) =>
-    '<path d="M52 ${y + 8} q14 -16 28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 v14 h-280z" fill="#5DB33C"/>'
-    '<path d="M52 ${y + 8} q14 -16 28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0" stroke="#8ED45E" stroke-width="4" fill="none"/>';
+    '<path d="M60 ${y + 8} q14 -16 28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 v14 h-280z" fill="#5DB33C"/>'
+    '<path d="M60 ${y + 8} q14 -16 28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0" stroke="#8ED45E" stroke-width="4" fill="none"/>';
 
 String _tomato(double y) =>
     '<rect x="70" y="$y" width="120" height="16" rx="8" fill="#E8331C"/>'
@@ -113,8 +113,8 @@ final _doubleBurger = _svg(
 
 final _chickenBurger = _burger(
   filling:
-      '<path d="M54 262 q8 -10 18 -4 q10 -12 22 -4 q12 -10 24 -2 q12 -10 24 -2 q12 -10 24 -2 q12 -10 24 -2 q12 -10 24 -2 q12 -10 24 -2 q12 -10 24 -2 q12 -10 24 0 q14 -6 18 8 q6 20 -4 34 q-6 10 -20 8 h-240 q-14 2 -20 -8 q-10 -14 -4 -34z" fill="url(#crispy)"/>'
-      '<circle cx="100" cy="280" r="3" fill="#A65A10"/><circle cx="160" cy="288" r="3" fill="#A65A10"/><circle cx="230" cy="278" r="3" fill="#A65A10"/><circle cx="290" cy="290" r="3" fill="#A65A10"/>'
+      '<path d="M60 254 q14 -9 28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 q14 4 14 20 q0 16 -14 20 q-14 9 -28 0 t-28 0 t-28 0 t-28 0 t-28 0 t-28 0 t-28 0 t-28 0 t-28 0 t-28 0 q-14 -4 -14 -20 q0 -16 14 -20z" fill="url(#crispy)"/>'
+      '<circle cx="110" cy="276" r="3" fill="#A65A10"/><circle cx="170" cy="284" r="3" fill="#A65A10"/><circle cx="230" cy="274" r="3" fill="#A65A10"/><circle cx="290" cy="284" r="3" fill="#A65A10"/>'
       '<path d="M70 248 h260" stroke="#FFF7E0" stroke-width="10" stroke-linecap="round"/>'
       '${_lettuce(228)}',
 );

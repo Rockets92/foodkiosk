@@ -729,7 +729,7 @@ class _OrderBarState extends State<OrderBar>
                       child: Badge(
                         isLabelVisible: !empty,
                         backgroundColor: K.red,
-                        offset: const Offset(10, -10),
+                        offset: const Offset(-8, -8),
                         label: Text(
                           '${k.itemCount}',
                           style: const TextStyle(
