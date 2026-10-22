@@ -9,10 +9,13 @@ import '../../session.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'settings/devices_section.dart';
+import 'settings/discounts_section.dart';
 import 'settings/flow_section.dart';
 import 'settings/general_sections.dart';
+import 'settings/network_section.dart';
 
-/// Venue settings: demo mode, kiosk behaviour, order flow, devices, PIN.
+/// Venue settings: demo mode, kiosk behaviour, order flow, devices,
+/// network, PIN.
 /// Edits a local draft; nothing reaches the server until "Salva".
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -25,7 +28,9 @@ enum _Part {
   demo('Modalità demo', Icons.science_rounded),
   general('Generale', Icons.storefront_rounded),
   flow('Flusso ordine', Icons.alt_route_rounded),
+  discounts('Codici sconto', Icons.local_offer_rounded),
   devices('Dispositivi', Icons.devices_other_rounded),
+  network('Rete', Icons.lan_rounded),
   security('Sicurezza', Icons.lock_rounded);
 
   final String label;
@@ -235,11 +240,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onChanged: (f) => _set('flow', f.toJson()),
         onCounterFallback: (v) => _set('counterFallback', v),
       ),
+      _Part.discounts: DiscountsSection(
+        value: s.discounts,
+        onChanged: (d) => _set('discounts', d.toJson()),
+      ),
       _Part.devices: DevicesSection(
         s: s,
         adapters: _adapters,
         onChanged: (key, c) => _set(key, c.toJson()),
       ),
+      _Part.network: NetworkSection(api: context.staff.api),
       _Part.security: SecuritySection(
         newPin: _newPin,
         confirmPin: _confirmPin,

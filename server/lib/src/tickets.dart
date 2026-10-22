@@ -8,6 +8,8 @@ const _labels = {
     'eatIn': 'Consumo sul posto',
     'takeAway': 'Da asporto',
     'total': 'TOTALE',
+    'subtotal': 'Subtotale',
+    'discount': 'Sconto',
     'vat': 'di cui IVA',
     'payAtCounter': 'Paga in cassa mostrando questo scontrino',
     'paid': 'PAGATO',
@@ -21,6 +23,8 @@ const _labels = {
     'eatIn': 'Eat in',
     'takeAway': 'Take away',
     'total': 'TOTAL',
+    'subtotal': 'Subtotal',
+    'discount': 'Discount',
     'vat': 'incl. VAT',
     'payAtCounter': 'Please pay at the counter with this ticket',
     'paid': 'PAID',
@@ -75,6 +79,14 @@ Ticket customerTicket(Order order, KioskSettings settings) {
         TicketText('   "${line.note}"'),
     ],
     const TicketSeparator(),
+    if (order.discount case final d?) ...[
+      TicketRow(_l(lang, 'subtotal'), money(order.subtotalCents)),
+      TicketRow(
+        '${_l(lang, 'discount')} ${d.code}',
+        '-${money(d.amountCents)}',
+      ),
+      if (!d.label.isEmpty) TicketText('   ${d.label.resolve(lang)}'),
+    ],
     TicketRow(_l(lang, 'total'), money(order.totalCents), bold: true),
     for (final e in order.vatBreakdown.entries)
       TicketRow(

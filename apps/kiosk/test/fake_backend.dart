@@ -91,6 +91,29 @@ final testMenu = Menu(
   ],
 );
 
+final testDiscounts = [
+  DiscountCode(
+    id: 'd1',
+    code: 'SCONTO10',
+    type: DiscountType.percent,
+    percent: 10,
+    label: tx('Sconto 10%', '10% off'),
+  ),
+  DiscountCode(
+    id: 'd2',
+    code: 'COLAGRATIS',
+    type: DiscountType.freeProduct,
+    productId: 'cola',
+  ),
+  DiscountCode(
+    id: 'd3',
+    code: 'MENO5',
+    type: DiscountType.amount,
+    amountCents: 500,
+    minOrderCents: 2000,
+  ),
+];
+
 /// In-memory server used by the widget tests.
 class FakeBackend extends KioskBackend {
   KioskSettings settingsValue;
@@ -100,6 +123,11 @@ class FakeBackend extends KioskBackend {
   final List<bool> paymentResults = [];
   final List<OrderRequest> requests = [];
   final List<String> cancelled = [];
+
+  /// Codes the fake server knows.
+  final Map<String, DiscountCode> discounts = {
+    for (final c in testDiscounts) c.code: c,
+  };
   final _orders = <String, Order>{};
   int _number = 0;
 
@@ -162,6 +190,13 @@ class FakeBackend extends KioskBackend {
         _ => PaymentStatus.notRequired,
       },
       isDemo: settingsValue.demoMode,
+      discount: switch (discounts[request.discountCode]) {
+        final c? => OrderDiscount.of(
+          c,
+          c.evaluate(lines.map((l) => l.discountable)).amountCents,
+        ),
+        null => null,
+      },
     );
     return _orders[order.id] = order;
   }
@@ -191,6 +226,11 @@ class FakeBackend extends KioskBackend {
       status: OrderStatus.cancelled,
     );
   }
+
+  @override
+  Future<DiscountCode> checkDiscount(String code) async =>
+      discounts[code] ??
+      (throw BackendException(404, 'codeNotFound', 'Unknown code'));
 
   @override
   Future<bool> verifyStaffPin(String pin) async => pin == '1234';

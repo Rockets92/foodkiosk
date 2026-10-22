@@ -157,6 +157,18 @@ Future<void> _serve(
   );
   final s = app.settings.current;
   log('Food Kiosk server on http://${server.address.host}:${server.port}');
+  try {
+    for (final i in await NetworkInterface.list(
+      type: InternetAddressType.IPv4,
+    )) {
+      for (final a in i.addresses) {
+        if (a.isLoopback || a.isLinkLocal) continue;
+        log('  from other devices: http://${a.address}:${server.port}');
+      }
+    }
+  } on SocketException {
+    // Nothing to show.
+  }
   log('  data:  ${p.absolute(dataDir.path)}');
   for (final name in webApps.keys) {
     log('  $name: http://localhost:${server.port}/$name/');

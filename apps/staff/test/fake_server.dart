@@ -84,6 +84,26 @@ class FakeServer {
   Menu menu = demoMenu;
   List<Order> orders = [];
   final requests = <String>[];
+  List<DiscountCode> discounts = [
+    DiscountCode(
+      id: 'd1',
+      code: 'SCONTO10',
+      type: DiscountType.percent,
+      percent: 10,
+      maxUses: 50,
+      usedCount: 12,
+      label: tx('Sconto 10%'),
+    ),
+    DiscountCode(
+      id: 'd2',
+      code: 'COLAGRATIS',
+      type: DiscountType.freeProduct,
+      productId: 'cola',
+    ),
+  ];
+
+  /// Bodies of the orders entered at the till.
+  final counterOrders = <Map<String, Object?>>[];
 
   late final client = MockClient(_handle);
 
@@ -153,6 +173,18 @@ class FakeServer {
           'valid': flow.isValid,
           'issues': [for (final i in flow.validate()) i.toJson()],
         });
+      case ('GET', '/api/admin/network'):
+        return _json({
+          'hostname': 'CASSA-PC',
+          'addresses': ['192.168.1.20'],
+          'devices': [
+            {
+              'kind': 'totem',
+              'address': '192.168.1.31',
+              'since': DateTime.now().toUtc().toIso8601String(),
+            },
+          ],
+        });
       case ('GET', '/api/admin/adapters'):
         return _json({
           'payment': ['none', 'demo'],
@@ -163,10 +195,34 @@ class FakeServer {
         return _json({
           'orders': [for (final o in orders) o.toJson()],
         });
+      case ('GET', '/api/admin/discounts'):
+        return _json({
+          'codes': [for (final c in discounts) c.toJson()],
+        });
+      case ('POST', '/api/admin/discounts'):
+        final c = DiscountCode.fromJson({
+          ...body,
+          'id': 'd${discounts.length + 1}',
+        });
+        discounts = [c, ...discounts];
+        return _json(c.toJson(), 201);
+      case ('POST', '/api/staff/discounts/check'):
+        final code = DiscountCode.normalize(body['code'] as String);
+        final found = discounts.where((c) => c.code == code).firstOrNull;
+        return found == null
+            ? _json({
+                'error': 'codeNotFound',
+                'message': 'Codice inesistente',
+              }, 404)
+            : _json(found.toPublicJson());
       case ('POST', '/api/staff/orders'):
+        counterOrders.add(body);
         final request = OrderRequest.fromJson(body);
         final lines = price(request);
         final method = body['payment'] as String?;
+        final code = discounts
+            .where((c) => c.code == request.discountCode)
+            .firstOrNull;
         final order = Order(
           id: 'o${orders.length + 100}',
           number: orders.length + 100,
@@ -180,6 +236,12 @@ class FakeServer {
               ? PaymentStatus.awaitingCounter
               : PaymentStatus.paid,
           payment: method == null ? null : payment(method),
+          discount: code == null
+              ? null
+              : OrderDiscount.of(
+                  code,
+                  code.evaluate(lines.map((l) => l.discountable)).amountCents,
+                ),
         );
         orders.add(order);
         return _json(order.toJson(), 201);
@@ -272,6 +334,11 @@ class FakeServer {
           (o) => o.withEvent('action', detail: segments[5]),
         ).toJson(),
       );
+    }
+    if (req.method == 'PUT' && segments[2] == 'discounts') {
+      final c = DiscountCode.fromJson(body);
+      discounts = [for (final x in discounts) x.id == c.id ? c : x];
+      return _json(c.toJson());
     }
     if (req.method == 'PATCH' && segments[2] == 'products') {
       final p = menu.product(segments[3])!;

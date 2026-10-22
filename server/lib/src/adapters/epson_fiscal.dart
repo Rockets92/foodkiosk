@@ -115,7 +115,8 @@ class EpsonFiscalPrinter extends FiscalDevice {
   }
 
   /// The SOAP request for a sale: one item per line, priced extras as
-  /// their own items, then the total with the payment type.
+  /// their own items, a discount on the subtotal for a discount code, then
+  /// the total with the payment type.
   String buildReceipt(Order order) {
     final b = StringBuffer()
       ..write('<?xml version="1.0" encoding="utf-8"?>')
@@ -145,6 +146,13 @@ class EpsonFiscalPrinter extends FiscalDevice {
           ),
         );
       }
+    }
+    if (order.discountCents > 0) {
+      b.write(
+        '<printRecSubtotalAdjustment operator="$operator" adjustmentType="1" '
+        'description="${_escape(_truncate('SCONTO ${order.discount!.code}', 38))}" '
+        'amount="${_amount(order.discountCents)}" justification="1" />',
+      );
     }
     final pay = order.payment;
     final totals = <(Cents, int)>[

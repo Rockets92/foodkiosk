@@ -11,6 +11,7 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf_web_socket/shelf_web_socket.dart';
 
 import 'adapters/registry.dart';
+import 'discount_service.dart';
 import 'errors.dart';
 import 'event_bus.dart';
 import 'menu_service.dart';
@@ -47,6 +48,21 @@ const _publicEvents = {
   ServerEvent.pickupAnnounce,
 };
 
+/// A device listening for live events: a totem, a staff station or a
+/// pickup screen.
+class ConnectedDevice {
+  final String kind;
+  final String address;
+  final DateTime since;
+  ConnectedDevice(this.kind, this.address, this.since);
+
+  Map<String, Object?> toJson() => {
+    'kind': kind,
+    'address': address,
+    'since': since.toUtc().toIso8601String(),
+  };
+}
+
 class Api {
   final SettingsService settings;
   final MenuService menu;
@@ -54,15 +70,20 @@ class Api {
   /// Folder where uploaded photos are stored and served from `/media/`.
   final String? mediaDir;
   final OrderService orders;
+  final DiscountService discounts;
   final PrintJobRepository printJobs;
   final AdapterRegistry registry;
   final EventBus bus;
   final Handler? mediaHandler;
 
+  /// Devices with an open live connection, for the "Rete" settings.
+  final Set<ConnectedDevice> devices = {};
+
   Api({
     required this.settings,
     required this.menu,
     required this.orders,
+    required this.discounts,
     required this.printJobs,
     required this.registry,
     required this.bus,
@@ -110,6 +131,15 @@ class Api {
           ],
         }),
       )
+      ..post('/discounts/check', (Request req) async {
+        final body = await _body(req);
+        final code = discounts.lookup(
+          body['code'] as String? ?? '',
+          channel: DiscountChannel.kiosk,
+          client: _clientOf(req),
+        );
+        return _ok(code.toPublicJson());
+      })
       ..post('/orders', (Request req) async {
         final body = await _body(req);
         final order = await orders.create(OrderRequest.fromJson(body));
@@ -184,6 +214,42 @@ class Api {
         );
       })
       ..get('/staff/orders', _listOrders)
+      ..post('/staff/discounts/check', (Request req) async {
+        final body = await _body(req);
+        return _ok(
+          discounts
+              .lookup(
+                body['code'] as String? ?? '',
+                channel: DiscountChannel.counter,
+                client: 'staff',
+              )
+              .toPublicJson(),
+        );
+      })
+      ..get(
+        '/admin/discounts',
+        (Request _) => _ok({
+          'codes': [for (final c in discounts.all()) c.toJson()],
+        }),
+      )
+      ..post(
+        '/admin/discounts',
+        (Request req) async =>
+            _ok(discounts.save(await _body(req)).toJson(), status: 201),
+      )
+      ..put(
+        '/admin/discounts/<id>',
+        (Request req, String id) async =>
+            _ok(discounts.save(await _body(req), id: id).toJson()),
+      )
+      ..post(
+        '/admin/discounts/<id>/reset-uses',
+        (Request _, String id) => _ok(discounts.resetUses(id).toJson()),
+      )
+      ..delete('/admin/discounts/<id>', (Request _, String id) {
+        discounts.delete(id);
+        return Response(204);
+      })
       ..post('/staff/orders', (Request req) async {
         final body = await _body(req);
         final method = body['payment'] as String?;
@@ -280,6 +346,7 @@ class Api {
         });
       })
       ..get('/admin/adapters', (Request _) => _ok(registry.describe()))
+      ..get('/admin/network', (Request _) async => _ok(await _network()))
       ..post('/admin/media', _upload)
       ..get('/admin/menu', (Request _) => _ok(menu.fullMenu().toJson()))
       ..post(
@@ -395,18 +462,53 @@ class Api {
     });
   }
 
+  static String _clientOf(Request req) {
+    final info = req.context['shelf.io.connection_info'];
+    return info is HttpConnectionInfo ? info.remoteAddress.address : '';
+  }
+
   FutureOr<Response> _webSocket(Request req) {
     final staff = _isStaff(req);
+    final info = req.context['shelf.io.connection_info'];
+    final device = ConnectedDevice(
+      req.url.queryParameters['device'] ?? (staff ? 'staff' : 'other'),
+      info is HttpConnectionInfo ? info.remoteAddress.address : '',
+      DateTime.now(),
+    );
     return webSocketHandler((channel, _) {
+      devices.add(device);
       final sub = bus.stream
           .where((e) => staff || _publicEvents.contains(e.type))
           .listen((e) => channel.sink.add(jsonEncode(e.toJson())));
-      channel.stream.listen(
-        (_) {},
-        onDone: sub.cancel,
-        onError: (_) => sub.cancel(),
-      );
+      void gone() {
+        devices.remove(device);
+        sub.cancel();
+      }
+
+      channel.stream.listen((_) {}, onDone: gone, onError: (_) => gone());
     })(req);
+  }
+
+  /// This PC's LAN addresses (the other devices use one of them, with the
+  /// server's port) and the devices connected right now.
+  Future<Map<String, Object?>> _network() async {
+    var addresses = <String>[];
+    try {
+      addresses = [
+        for (final i in await NetworkInterface.list(
+          type: InternetAddressType.IPv4,
+        ))
+          for (final a in i.addresses)
+            if (!a.isLoopback && !a.isLinkLocal) a.address,
+      ];
+    } on SocketException {
+      // No interfaces to report.
+    }
+    return {
+      'hostname': Platform.localHostname,
+      'addresses': addresses,
+      'devices': [for (final d in devices) d.toJson()],
+    };
   }
 }
 

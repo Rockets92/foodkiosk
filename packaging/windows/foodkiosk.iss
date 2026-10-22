@@ -48,6 +48,7 @@ Name: "{commonappdata}\FoodKiosk"; Permissions: users-modify
 
 [Files]
 Source: "{#SourceDir}\server\*"; DestDir: "{app}\server"; Components: server; Flags: recursesubdirs ignoreversion
+Source: "{#SourceDir}\simulatore\*"; DestDir: "{app}\simulatore"; Components: server; Flags: recursesubdirs ignoreversion
 Source: "{#SourceDir}\LEGGIMI.txt"; DestDir: "{app}"; Components: server; Flags: ignoreversion
 Source: "{#SourceDir}\totem\*"; DestDir: "{app}\totem"; Components: totem; Flags: recursesubdirs ignoreversion
 Source: "{#SourceDir}\staff\*"; DestDir: "{app}\staff"; Components: staff; Flags: recursesubdirs ignoreversion
@@ -58,6 +59,7 @@ Source: "{#SourceDir}\staff\*"; DestDir: "{app}\staff"; Components: staff; Flags
 Name: "{group}\Food Kiosk Totem"; Filename: "{app}\totem\FoodKioskTotem.exe"; WorkingDir: "{app}\totem"; Components: totem
 Name: "{group}\Food Kiosk Totem in finestra"; Filename: "{app}\totem\FoodKioskTotem.exe"; Parameters: "--windowed"; WorkingDir: "{app}\totem"; Components: totem
 Name: "{group}\Food Kiosk Staff"; Filename: "{app}\staff\FoodKioskStaff.exe"; WorkingDir: "{app}\staff"; Components: staff
+Name: "{group}\Simulatore clienti (ordini di prova)"; Filename: "{app}\simulatore\bin\FoodKioskSimulatore.exe"; WorkingDir: "{app}\simulatore\bin"
 Name: "{group}\Avvia solo il server"; Filename: "{app}\server\bin\FoodKioskServer.exe"; Parameters: "--background"; WorkingDir: "{app}\server\bin"; Flags: runminimized
 Name: "{group}\Leggimi"; Filename: "{app}\LEGGIMI.txt"
 Name: "{group}\Disinstalla Food Kiosk"; Filename: "{uninstallexe}"

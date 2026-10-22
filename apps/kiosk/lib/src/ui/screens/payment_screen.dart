@@ -35,6 +35,22 @@ class PaymentScreen extends StatelessWidget {
                 context.money(order.totalCents),
                 style: KText.display.copyWith(fontSize: 96),
               ),
+              if (order.discountCents > 0)
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE3F6EC),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${order.discount!.code} · ${t('couponSaved', args: {'amount': context.money(order.discountCents)})}',
+                    style: KText.h3.copyWith(color: const Color(0xFF14A05A)),
+                  ),
+                ),
               const SizedBox(height: 40),
               AnimatedSwitcher(
                 duration: K.slow,

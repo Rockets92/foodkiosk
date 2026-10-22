@@ -18,7 +18,8 @@ function Run([string]$exe, [string[]]$arguments) {
 
 Run dart @('pub', 'get')
 Push-Location server
-Run dart @('build', 'cli', '-o', "$root\build\server")
+Run dart @('build', 'cli', '-t', 'bin/server.dart', '-o', "$root\build\server")
+Run dart @('build', 'cli', '-t', 'bin/simulate.dart', '-o', "$root\build\simulator")
 Pop-Location
 
 foreach ($app in 'kiosk', 'staff') {
@@ -32,6 +33,8 @@ if (Test-Path $Out) { Remove-Item $Out -Recurse -Force }
 New-Item -ItemType Directory -Force $Out | Out-Null
 Copy-Item "build\server\bundle" "$Out\server" -Recurse
 Rename-Item "$Out\server\bin\server.exe" "FoodKioskServer.exe"
+Copy-Item "build\simulator\bundle" "$Out\simulatore" -Recurse
+Rename-Item "$Out\simulatore\bin\simulate.exe" "FoodKioskSimulatore.exe"
 Copy-Item "apps\kiosk\build\windows\x64\runner\Release" "$Out\totem" -Recurse
 Copy-Item "apps\staff\build\windows\x64\runner\Release" "$Out\staff" -Recurse
 Copy-Item "packaging\windows\LEGGIMI.txt" $Out

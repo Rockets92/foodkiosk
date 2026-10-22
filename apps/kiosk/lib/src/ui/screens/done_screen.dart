@@ -185,6 +185,31 @@ class _Ticket extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (order.discountCents > 0) ...[
+                      const SizedBox(height: 14),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.local_offer_rounded,
+                            color: Color(0xFF14A05A),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            context.t(
+                              'couponSaved',
+                              args: {
+                                'amount': context.money(order.discountCents),
+                              },
+                            ),
+                            key: const ValueKey('done-saved'),
+                            style: KText.h3.copyWith(
+                              color: const Color(0xFF14A05A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ).animate().slideY(

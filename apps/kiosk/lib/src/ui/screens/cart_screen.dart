@@ -5,6 +5,7 @@ import 'package:kiosk_core/kiosk_core.dart';
 import '../scope.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/coupon.dart';
 import '../widgets/pressable.dart';
 import 'menu_screen.dart';
 
@@ -149,7 +150,20 @@ class _CartLineTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(t.text(product.name), style: KText.h3),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(t.text(product.name), style: KText.h3),
+                    ),
+                    if (k.couponProduct?.id == product.id &&
+                        k.discountCents > 0 &&
+                        k.cart.indexWhere((l) => l.productId == product.id) ==
+                            index) ...[
+                      const SizedBox(width: 10),
+                      const FreeBadge(key: ValueKey('free-badge')),
+                    ],
+                  ],
+                ),
                 if (optionNames.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
@@ -313,6 +327,10 @@ class _CheckoutPanel extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (k.discountsEnabled && k.cart.isNotEmpty) ...[
+            const CouponEntry(),
+            const SizedBox(height: 18),
+          ],
           if (k.errorKey != null)
             Container(
               width: double.infinity,
@@ -340,6 +358,7 @@ class _CheckoutPanel extends StatelessWidget {
                 ],
               ),
             ).animate().shake(hz: 4, duration: 400.ms),
+          const CouponTotals(),
           Row(
             children: [
               Column(
@@ -351,7 +370,8 @@ class _CheckoutPanel extends StatelessWidget {
               ),
               const Spacer(),
               AnimatedAmount(
-                context.money(k.cartTotal),
+                context.money(k.payableTotal),
+                key: const ValueKey('payable-total'),
                 style: KText.display.copyWith(fontSize: 52),
               ),
             ],

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:kiosk_core/kiosk_core.dart';
+import 'package:sqlite3/sqlite3.dart' show Row;
 
 import 'database.dart';
 
@@ -248,6 +249,77 @@ class OrderRepository {
         Order.fromJson(_decode(r['data'])),
     ];
   }
+}
+
+/// Discount codes. The use counter lives in its own column so that
+/// claiming a use is a single atomic update.
+class DiscountRepository {
+  final AppDatabase _db;
+  DiscountRepository(this._db);
+
+  DiscountCode _read(Row r) => DiscountCode.fromJson(
+    _decode(r['data']),
+  ).copyWith(usedCount: r['used_count'] as int);
+
+  List<DiscountCode> all() => [
+    for (final r in _db.db.select(
+      'SELECT data, used_count FROM discount_codes ORDER BY rowid DESC',
+    ))
+      _read(r),
+  ];
+
+  DiscountCode? byId(String id) {
+    final r = _db.db.select(
+      'SELECT data, used_count FROM discount_codes WHERE id = ?',
+      [id],
+    );
+    return r.isEmpty ? null : _read(r.first);
+  }
+
+  DiscountCode? byCode(String code) {
+    final r = _db.db.select(
+      'SELECT data, used_count FROM discount_codes WHERE code = ?',
+      [code],
+    );
+    return r.isEmpty ? null : _read(r.first);
+  }
+
+  /// Saves everything but the use counter.
+  void upsert(DiscountCode c) => _db.db.execute(
+    'INSERT INTO discount_codes(id, code, data) VALUES(?, ?, ?) '
+    'ON CONFLICT(id) DO UPDATE SET code = excluded.code, '
+    'data = excluded.data',
+    [c.id, c.code, jsonEncode(c.toJson())],
+  );
+
+  bool delete(String id) {
+    _db.db.execute('DELETE FROM discount_codes WHERE id = ?', [id]);
+    return _db.db.updatedRows > 0;
+  }
+
+  /// Takes one use if the limit allows; false when exhausted.
+  bool claim(String id, int? maxUses) {
+    _db.db.execute(
+      'UPDATE discount_codes SET used_count = used_count + 1 '
+      'WHERE id = ? AND (? IS NULL OR used_count < ?)',
+      [id, maxUses, maxUses],
+    );
+    return _db.db.updatedRows > 0;
+  }
+
+  void release(String id) => _db.db.execute(
+    'UPDATE discount_codes SET used_count = MAX(used_count - 1, 0) '
+    'WHERE id = ?',
+    [id],
+  );
+
+  void resetUses(String id) => _db.db.execute(
+    'UPDATE discount_codes SET used_count = 0 WHERE id = ?',
+    [id],
+  );
+
+  bool get isEmpty =>
+      _db.db.select('SELECT COUNT(*) AS n FROM discount_codes').first['n'] == 0;
 }
 
 class PrintJob {

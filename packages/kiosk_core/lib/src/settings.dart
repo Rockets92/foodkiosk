@@ -1,3 +1,4 @@
+import 'discount.dart';
 import 'flow.dart';
 import 'order.dart';
 
@@ -51,6 +52,9 @@ class KioskSettings {
   /// When a kiosk payment fails, let the customer choose to pay at the
   /// till instead of abandoning the order.
   final bool counterFallback;
+
+  /// Discount codes: whether they are accepted, and where and how.
+  final DiscountSettings discounts;
   final AdapterConfig payment;
   final AdapterConfig fiscal;
   final AdapterConfig customerPrinter;
@@ -73,6 +77,7 @@ class KioskSettings {
     this.idleTimeoutSeconds = 90,
     this.maxQuantityPerLine = 20,
     this.counterFallback = true,
+    this.discounts = const DiscountSettings(),
     this.payment = AdapterConfig.demo,
     this.fiscal = AdapterConfig.none,
     this.customerPrinter = AdapterConfig.demo,
@@ -97,6 +102,12 @@ class KioskSettings {
     }
     if (maxQuantityPerLine < 1) {
       errors.add('The maximum quantity per line must be at least 1.');
+    }
+    if (discounts.enabled && !discounts.onKiosk && !discounts.onCounter) {
+      errors.add(
+        'Discount codes are enabled but cannot be entered anywhere: '
+        'enable typing or the reader on the kiosk, or the till.',
+      );
     }
     if (adminPin.length < 4) errors.add('The admin PIN needs 4+ characters.');
     for (final issue in flow.validate()) {
@@ -144,6 +155,9 @@ class KioskSettings {
       maxQuantityPerLine:
           json['maxQuantityPerLine'] as int? ?? d.maxQuantityPerLine,
       counterFallback: json['counterFallback'] as bool? ?? d.counterFallback,
+      discounts: json['discounts'] == null
+          ? d.discounts
+          : DiscountSettings.fromJson(json['discounts']),
       payment: AdapterConfig.fromJson(json['payment'], d.payment),
       fiscal: AdapterConfig.fromJson(json['fiscal'], d.fiscal),
       customerPrinter: AdapterConfig.fromJson(
@@ -183,5 +197,6 @@ class KioskSettings {
     'idleTimeoutSeconds': idleTimeoutSeconds,
     'maxQuantityPerLine': maxQuantityPerLine,
     'counterFallback': counterFallback,
+    'discounts': discounts.toJson(),
   };
 }

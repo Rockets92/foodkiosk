@@ -472,6 +472,43 @@ final demoMenu = Menu(
   ],
 );
 
+/// Codes to try the discounts with the demo menu.
+final demoDiscounts = [
+  DiscountCode(
+    id: 'demo-welcome',
+    code: 'BENVENUTO10',
+    type: DiscountType.percent,
+    percent: 10,
+    label: _t('Sconto benvenuto 10%', 'Welcome discount 10%'),
+    note: 'Demo: 10% su tutto l\'ordine',
+  ),
+  DiscountCode(
+    id: 'demo-amount',
+    code: 'MENO3',
+    type: DiscountType.amount,
+    amountCents: 300,
+    minOrderCents: 1500,
+    maxUses: 100,
+    label: _t('3 € di sconto', '€3 off'),
+    note: 'Demo: 3 € con almeno 15 € di spesa',
+  ),
+  DiscountCode(
+    id: 'demo-fries',
+    code: 'PATATINE',
+    type: DiscountType.freeProduct,
+    productId: 'fries',
+    maxUses: 50,
+    label: _t('Patatine in omaggio', 'Free fries'),
+    note: 'Demo: una porzione di patatine gratis',
+  ),
+];
+
+void seedDemoDiscounts(DiscountRepository repo) {
+  for (final d in demoDiscounts) {
+    repo.upsert(d);
+  }
+}
+
 void seedDemoMenu(MenuRepository repo) {
   for (final g in demoMenu.modifierGroups) {
     repo.upsertModifierGroup(g);

@@ -1,4 +1,5 @@
 import 'allergen.dart';
+import 'discount.dart';
 import 'flow.dart';
 import 'localized_text.dart';
 import 'money.dart';
@@ -129,6 +130,13 @@ class OrderLine {
       unitPriceCents + options.fold(0, (s, o) => s + o.priceDeltaCents);
 
   Cents get totalCents => unitTotalCents * quantity;
+
+  DiscountableLine get discountable => (
+    productId: productId,
+    quantity: quantity,
+    unitBaseCents: unitPriceCents,
+    totalCents: totalCents,
+  );
 
   factory OrderLine.fromJson(Map<String, Object?> json) => OrderLine(
     productId: json['productId'] as String,
@@ -288,6 +296,9 @@ class Order {
   final OrderOrigin origin;
   final PaymentInfo? payment;
   final FiscalDocument? fiscalDocument;
+
+  /// The discount code applied, if any.
+  final OrderDiscount? discount;
   final List<OrderEvent> history;
 
   const Order({
@@ -305,22 +316,50 @@ class Order {
     this.origin = OrderOrigin.kiosk,
     this.payment,
     this.fiscalDocument,
+    this.discount,
     this.history = const [],
   });
 
-  Cents get totalCents => lines.fold(0, (s, l) => s + l.totalCents);
+  /// Items before the discount.
+  Cents get subtotalCents => lines.fold(0, (s, l) => s + l.totalCents);
+
+  Cents get discountCents =>
+      (discount?.amountCents ?? 0).clamp(0, subtotalCents);
+
+  /// What the customer pays.
+  Cents get totalCents => subtotalCents - discountCents;
 
   int get itemCount => lines.fold(0, (s, l) => s + l.quantity);
 
   /// VAT included in the total, grouped by rate (prices are VAT-inclusive).
+  /// The discount reduces each rate in proportion to its share of the
+  /// order, or only the free product's rate.
   Map<double, Cents> get vatBreakdown {
-    final result = <double, Cents>{};
+    final gross = <double, Cents>{};
     for (final l in lines) {
-      final gross = l.totalCents;
-      final vat = (gross - gross / (1 + l.vatRate / 100)).round();
-      result[l.vatRate] = (result[l.vatRate] ?? 0) + vat;
+      gross[l.vatRate] = (gross[l.vatRate] ?? 0) + l.totalCents;
     }
-    return result;
+    var off = discountCents;
+    final free = discount?.type == DiscountType.freeProduct
+        ? lines.where((l) => l.productId == discount!.productId).firstOrNull
+        : null;
+    if (free != null) {
+      gross[free.vatRate] = gross[free.vatRate]! - off;
+    } else if (off > 0) {
+      final subtotal = subtotalCents;
+      final rates = gross.keys.toList();
+      for (final (i, rate) in rates.indexed) {
+        final share = i == rates.length - 1
+            ? off
+            : (discountCents * gross[rate]! / subtotal).round();
+        gross[rate] = gross[rate]! - share;
+        off -= share;
+      }
+    }
+    return {
+      for (final e in gross.entries)
+        e.key: (e.value - e.value / (1 + e.key / 100)).round(),
+    };
   }
 
   String get displayNumber => number.toString().padLeft(3, '0');
@@ -335,6 +374,33 @@ class Order {
     PaymentInfo? payment,
     FiscalDocument? fiscalDocument,
     List<OrderEvent>? history,
+  }) => _copy(
+    serviceMode: serviceMode,
+    lines: lines,
+    status: status,
+    paymentStatus: paymentStatus,
+    kitchenStatus: kitchenStatus,
+    paymentMode: paymentMode,
+    payment: payment,
+    fiscalDocument: fiscalDocument,
+    history: history,
+    discount: discount,
+  );
+
+  /// Applies or (with null) removes the discount.
+  Order withDiscount(OrderDiscount? discount) => _copy(discount: discount);
+
+  Order _copy({
+    ServiceMode? serviceMode,
+    List<OrderLine>? lines,
+    OrderStatus? status,
+    PaymentStatus? paymentStatus,
+    KitchenStatus? kitchenStatus,
+    PaymentMode? paymentMode,
+    PaymentInfo? payment,
+    FiscalDocument? fiscalDocument,
+    List<OrderEvent>? history,
+    required OrderDiscount? discount,
   }) => Order(
     id: id,
     number: number,
@@ -350,6 +416,7 @@ class Order {
     origin: origin,
     payment: payment ?? this.payment,
     fiscalDocument: fiscalDocument ?? this.fiscalDocument,
+    discount: discount,
     history: history ?? this.history,
   );
 
@@ -386,6 +453,9 @@ class Order {
     fiscalDocument: json['fiscalDocument'] == null
         ? null
         : FiscalDocument.fromJson((json['fiscalDocument'] as Map).cast()),
+    discount: json['discount'] == null
+        ? null
+        : OrderDiscount.fromJson((json['discount'] as Map).cast()),
     history: [
       for (final e in (json['history'] as List? ?? const []))
         OrderEvent.fromJson((e as Map).cast()),
@@ -408,7 +478,10 @@ class Order {
     'origin': origin.name,
     'payment': payment?.toJson(),
     'fiscalDocument': fiscalDocument?.toJson(),
+    'discount': discount?.toJson(),
     'history': [for (final e in history) e.toJson()],
+    'subtotalCents': subtotalCents,
+    'discountCents': discountCents,
     'totalCents': totalCents,
   };
 }
@@ -424,11 +497,15 @@ class OrderRequest {
   /// [PaymentMode.counter].
   final PaymentMode? paymentChoice;
 
+  /// A discount code typed or scanned by the customer (or the cashier).
+  final String? discountCode;
+
   const OrderRequest({
     required this.serviceMode,
     required this.language,
     required this.lines,
     this.paymentChoice,
+    this.discountCode,
   });
 
   factory OrderRequest.fromJson(Map<String, Object?> json) => OrderRequest(
@@ -443,6 +520,7 @@ class OrderRequest {
     paymentChoice: json['paymentChoice'] == null
         ? null
         : PaymentMode.tryParse(json['paymentChoice'] as String),
+    discountCode: json['discountCode'] as String?,
   );
 
   Map<String, Object?> toJson() => {
@@ -450,6 +528,7 @@ class OrderRequest {
     'language': language,
     'lines': [for (final l in lines) l.toJson()],
     'paymentChoice': paymentChoice?.name,
+    'discountCode': ?discountCode,
   };
 }
 

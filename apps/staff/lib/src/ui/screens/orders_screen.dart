@@ -587,6 +587,35 @@ class _OrderDetailState extends State<_OrderDetail> {
                 ],
                 for (final l in order.lines) _LineTile(line: l, money: money),
                 const Divider(height: 28, color: S.line),
+                if (order.discount case final d?) ...[
+                  _AmountRow('Subtotale', money(order.subtotalCents)),
+                  Row(
+                    key: const ValueKey('order-discount'),
+                    children: [
+                      const Icon(
+                        Icons.local_offer_rounded,
+                        size: 18,
+                        color: S.success,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Sconto ${d.code}'
+                          '${d.label.isEmpty ? '' : ' · ${d.label.resolve('it')}'}',
+                          style: ST.body.copyWith(color: S.success),
+                        ),
+                      ),
+                      Text(
+                        '-${money(order.discountCents)}',
+                        style: ST.body.copyWith(
+                          color: S.success,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                ],
                 for (final e in order.vatBreakdown.entries)
                   _AmountRow(
                     'di cui IVA ${_rate(e.key)}%',
@@ -938,7 +967,15 @@ class _HistoryTile extends StatelessWidget {
     return switch (e.type) {
       'created' => ('Ordine creato', S.info),
       'createdAtCounter' => ('Ordine fatto in cassa', S.info),
-      'edited' => ('Prodotti modificati in cassa', S.info),
+      'edited' => (
+        switch (e.detail) {
+          'discountRemoved' => 'Modificato in cassa · codice sconto tolto',
+          final d? when d.startsWith('discount:') =>
+            'Modificato in cassa · codice ${d.substring(9)}',
+          _ => 'Prodotti modificati in cassa',
+        },
+        S.info,
+      ),
       'paymentStarted' => ('Pagamento avviato sul totem', S.info),
       'paymentFailed' => (
         'Pagamento rifiutato${e.detail == null ? '' : ': ${e.detail}'}',

@@ -127,7 +127,44 @@ class _AttractScreenState extends State<AttractScreen>
                             ),
                     ),
                     _Cta(text: t('touchToOrder')),
-                    const SizedBox(height: 72),
+                    if (k.discountsEnabled && k.settings.discounts.scanner)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 26),
+                        child: Container(
+                          key: const ValueKey('attract-scan'),
+                          padding: const EdgeInsets.fromLTRB(16, 10, 24, 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(30),
+                            border: Border.all(color: Colors.white38),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                    Icons.qr_code_scanner_rounded,
+                                    color: K.yellow,
+                                    size: 30,
+                                  )
+                                  .animate(onPlay: (c) => c.repeat())
+                                  .shimmer(
+                                    duration: 1600.ms,
+                                    color: Colors.white,
+                                  ),
+                              const SizedBox(width: 10),
+                              Text(
+                                t('couponScanStart'),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 56),
                   ],
                 ),
               ),
