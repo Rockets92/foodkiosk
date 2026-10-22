@@ -289,7 +289,7 @@ class _CategoryEditorState extends State<_CategoryEditor> {
       actions: [
         if (_c != null)
           TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: S.red),
+            style: TextButton.styleFrom(foregroundColor: S.primary),
             onPressed: _busy ? null : _delete,
             icon: const Icon(Icons.delete_outline_rounded),
             label: const Text('Elimina'),

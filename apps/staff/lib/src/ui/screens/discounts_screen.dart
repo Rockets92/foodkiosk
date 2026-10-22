@@ -384,7 +384,7 @@ class _CodeCard extends StatelessWidget {
                       child: ListTile(
                         leading: Icon(
                           Icons.delete_outline_rounded,
-                          color: S.red,
+                          color: S.danger,
                         ),
                         title: Text('Elimina'),
                       ),

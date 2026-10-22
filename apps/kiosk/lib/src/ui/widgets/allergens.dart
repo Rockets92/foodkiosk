@@ -98,7 +98,7 @@ class DietaryBadges extends StatelessWidget {
                       ? Icons.local_fire_department_rounded
                       : Icons.eco_rounded,
                   size: 14,
-                  color: tag == DietaryTag.spicy ? K.red : K.success,
+                  color: tag == DietaryTag.spicy ? K.danger : K.success,
                 ),
                 const SizedBox(width: 4),
                 Text(
@@ -106,7 +106,7 @@ class DietaryBadges extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: tag == DietaryTag.spicy ? K.red : K.success,
+                    color: tag == DietaryTag.spicy ? K.danger : K.success,
                   ),
                 ),
               ],

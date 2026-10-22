@@ -70,7 +70,7 @@ class ModifiersTab extends StatelessWidget {
                       ),
                       Pill(
                         g.required ? 'Obbligatorio' : 'Facoltativo',
-                        color: g.required ? S.red : S.info,
+                        color: g.required ? S.primary : S.info,
                       ),
                     ],
                   ),
@@ -359,7 +359,7 @@ class _GroupEditorState extends State<_GroupEditor> {
                 const SizedBox(width: 16),
                 Pill(
                   min >= 1 ? 'Obbligatorio' : 'Facoltativo',
-                  color: min >= 1 ? S.red : S.info,
+                  color: min >= 1 ? S.primary : S.info,
                 ),
               ],
             ),
@@ -396,7 +396,7 @@ class _GroupEditorState extends State<_GroupEditor> {
       actions: [
         if (_g != null)
           TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: S.red),
+            style: TextButton.styleFrom(foregroundColor: S.primary),
             onPressed: _busy ? null : _delete,
             icon: const Icon(Icons.delete_outline_rounded),
             label: const Text('Elimina'),

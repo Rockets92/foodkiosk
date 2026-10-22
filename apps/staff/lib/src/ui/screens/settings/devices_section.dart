@@ -80,7 +80,7 @@ class DevicesSection extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: S.yellow.withValues(alpha: 0.18),
+                color: S.accent.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Row(

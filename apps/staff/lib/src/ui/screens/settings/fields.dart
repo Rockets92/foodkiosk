@@ -10,7 +10,9 @@ class SectionCard extends StatelessWidget {
   final String title;
   final String? subtitle;
   final Widget child;
-  final Color accent;
+
+  /// Defaults to the palette's primary colour.
+  final Color? accent;
   final Widget? trailing;
 
   const SectionCard({
@@ -19,46 +21,49 @@ class SectionCard extends StatelessWidget {
     required this.title,
     this.subtitle,
     required this.child,
-    this.accent = S.red,
+    this.accent,
     this.trailing,
   });
 
   @override
-  Widget build(BuildContext context) => Panel(
-    padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
+  Widget build(BuildContext context) {
+    final accent = this.accent ?? S.primary;
+    return Panel(
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: accent),
               ),
-              child: Icon(icon, color: accent),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: ST.h2),
-                  if (subtitle != null) Text(subtitle!, style: ST.small),
-                ],
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: ST.h2),
+                    if (subtitle != null) Text(subtitle!, style: ST.small),
+                  ],
+                ),
               ),
-            ),
-            ?trailing,
-          ],
-        ),
-        const SizedBox(height: 20),
-        // List tiles inside paint their ink on this transparent Material.
-        Material(type: MaterialType.transparency, child: child),
-      ],
-    ),
-  );
+              ?trailing,
+            ],
+          ),
+          const SizedBox(height: 20),
+          // List tiles inside paint their ink on this transparent Material.
+          Material(type: MaterialType.transparency, child: child),
+        ],
+      ),
+    );
+  }
 }
 
 /// Label on the left, control on the right; stacks on narrow widths.

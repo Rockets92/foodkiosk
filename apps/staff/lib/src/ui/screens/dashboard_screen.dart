@@ -172,7 +172,7 @@ class _Body extends StatelessWidget {
         'Scontrino medio',
         money(_int('averageCents')),
         Icons.shopping_basket_rounded,
-        S.red,
+        S.primary,
         'sugli ordini pagati',
       ),
       (
@@ -207,7 +207,7 @@ class _Body extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: S.yellow.withValues(alpha: 0.25),
+              color: S.accent.withValues(alpha: 0.25),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
@@ -406,9 +406,9 @@ class _HourChart extends StatelessWidget {
                             height: max(4, 180 * v),
                             decoration: BoxDecoration(
                               color: hours[h] == peak && peak > 0
-                                  ? S.red
+                                  ? S.primary
                                   : hours[h] > 0
-                                  ? S.red.withValues(alpha: 0.45)
+                                  ? S.primary.withValues(alpha: 0.45)
                                   : S.line,
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -457,7 +457,7 @@ class _TopProducts extends StatelessWidget {
                       '${i + 1}',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
-                        color: i < 3 ? S.red : S.muted,
+                        color: i < 3 ? S.primary : S.muted,
                       ),
                     ),
                   ),
@@ -490,7 +490,7 @@ class _TopProducts extends StatelessWidget {
                             value: (p['quantity'] as num) / maxQty,
                             minHeight: 6,
                             backgroundColor: S.line,
-                            color: i < 3 ? S.red : S.yellow,
+                            color: i < 3 ? S.primary : S.accent,
                           ),
                         ),
                       ],
@@ -526,11 +526,11 @@ class _ModeSplit extends StatelessWidget {
               children: [
                 Expanded(
                   flex: max(1, (share * 1000).round()),
-                  child: Container(color: total == 0 ? S.line : S.red),
+                  child: Container(color: total == 0 ? S.line : S.primary),
                 ),
                 Expanded(
                   flex: max(1, ((1 - share) * 1000).round()),
-                  child: Container(color: total == 0 ? S.line : S.yellow),
+                  child: Container(color: total == 0 ? S.line : S.accent),
                 ),
               ],
             ),
@@ -540,7 +540,7 @@ class _ModeSplit extends StatelessWidget {
         Row(
           children: [
             _Legend(
-              color: S.red,
+              color: S.primary,
               icon: serviceModeIcon(ServiceMode.eatIn),
               text:
                   'Mangio qui $eatIn'
@@ -548,7 +548,7 @@ class _ModeSplit extends StatelessWidget {
             ),
             const Spacer(),
             _Legend(
-              color: S.yellow,
+              color: S.accent,
               icon: serviceModeIcon(ServiceMode.takeAway),
               text:
                   'Porto via $takeAway'

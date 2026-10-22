@@ -148,7 +148,7 @@ class _CouponPrompt extends StatelessWidget {
       onTap: () => CouponSheet.show(context),
       pressedScale: 0.98,
       child: CustomPaint(
-        painter: _DashedBorderPainter(color: K.red.withValues(alpha: 0.45)),
+        painter: _DashedBorderPainter(color: K.primary.withValues(alpha: 0.45)),
         child: Container(
           padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
           decoration: BoxDecoration(
@@ -160,8 +160,8 @@ class _CouponPrompt extends StatelessWidget {
               Container(
                     width: 56,
                     height: 56,
-                    decoration: const BoxDecoration(
-                      color: K.red,
+                    decoration: BoxDecoration(
+                      color: K.primary,
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -188,14 +188,10 @@ class _CouponPrompt extends StatelessWidget {
                 ),
               ),
               if (d.scanner) ...[
-                const Icon(
-                  Icons.qr_code_scanner_rounded,
-                  color: K.red,
-                  size: 34,
-                ),
+                Icon(Icons.qr_code_scanner_rounded, color: K.primary, size: 34),
                 const SizedBox(width: 10),
               ],
-              const Icon(Icons.chevron_right_rounded, color: K.red, size: 36),
+              Icon(Icons.chevron_right_rounded, color: K.primary, size: 36),
             ],
           ),
         ),
@@ -647,7 +643,7 @@ class _OrDivider extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 18),
     child: Row(
       children: [
-        const Expanded(child: Divider(color: K.line, thickness: 2)),
+        Expanded(child: Divider(color: K.line, thickness: 2)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
@@ -658,7 +654,7 @@ class _OrDivider extends StatelessWidget {
             ),
           ),
         ),
-        const Expanded(child: Divider(color: K.line, thickness: 2)),
+        Expanded(child: Divider(color: K.line, thickness: 2)),
       ],
     ),
   );
@@ -706,20 +702,20 @@ class _ScanPanel extends StatelessWidget {
                 const SizedBox(height: 14),
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                           Icons.keyboard_double_arrow_down_rounded,
-                          color: K.yellow,
+                          color: K.accent,
                           size: 38,
                         )
                         .animate(onPlay: (c) => c.repeat(reverse: true))
                         .moveY(begin: -4, end: 8, duration: 650.ms),
                     if (k.checkingCoupon) ...[
                       const SizedBox(width: 14),
-                      const SizedBox.square(
+                      SizedBox.square(
                         dimension: 26,
                         child: CircularProgressIndicator(
                           strokeWidth: 3.5,
-                          color: K.yellow,
+                          color: K.accent,
                         ),
                       ),
                     ],
@@ -785,7 +781,7 @@ class _ScanPainter extends CustomPainter {
     canvas.drawRRect(
       reader.deflate(8),
       Paint()
-        ..color = K.red.withValues(alpha: 0.5 + 0.5 * glow)
+        ..color = K.primary.withValues(alpha: 0.5 + 0.5 * glow)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
     );
 
@@ -831,7 +827,7 @@ class _ScanPainter extends CustomPainter {
         Offset(origin.dx - 14, ly),
         Offset(origin.dx + cells * cell + 14, ly),
         Paint()
-          ..color = K.red
+          ..color = K.primary
           ..strokeWidth = 4
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
       );
@@ -883,13 +879,13 @@ class _CodeField extends StatelessWidget {
       decoration: BoxDecoration(
         color: K.background,
         borderRadius: BorderRadius.circular(K.radius),
-        border: Border.all(color: error ? K.red : K.line, width: 3),
+        border: Border.all(color: error ? K.danger : K.line, width: 3),
       ),
       child: Row(
         children: [
           Icon(
             Icons.local_offer_rounded,
-            color: error ? K.red : K.muted,
+            color: error ? K.danger : K.muted,
             size: 36,
           ),
           const SizedBox(width: 18),
@@ -910,7 +906,7 @@ class _CodeField extends StatelessWidget {
                     ),
                   ),
                 ),
-                Container(width: 4, height: 52, color: K.red)
+                Container(width: 4, height: 52, color: K.primary)
                     .animate(onPlay: (c) => c.repeat(reverse: true))
                     .fade(begin: 1, end: 0, duration: 520.ms),
               ],
@@ -945,7 +941,7 @@ class _ErrorText extends StatelessWidget {
     key: const ValueKey('coupon-error'),
     mainAxisAlignment: MainAxisAlignment.center,
     children: [
-      const Icon(Icons.error_rounded, color: K.red),
+      const Icon(Icons.error_rounded, color: K.danger),
       const SizedBox(width: 8),
       Flexible(
         child: Text(
@@ -953,7 +949,7 @@ class _ErrorText extends StatelessWidget {
           style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w600,
-            color: K.redDark,
+            color: K.dangerDark,
           ),
         ),
       ),
@@ -1084,7 +1080,7 @@ class _Success extends StatelessWidget {
                         width: 10,
                         height: 10,
                         decoration: BoxDecoration(
-                          color: [K.yellow, K.red, _green][i % 3],
+                          color: [K.accent, K.primary, _green][i % 3],
                           shape: BoxShape.circle,
                         ),
                       )
@@ -1222,7 +1218,7 @@ class _CouponToastState extends State<CouponToast> {
                     key: const ValueKey('coupon-toast'),
                     padding: const EdgeInsets.fromLTRB(20, 16, 26, 16),
                     decoration: BoxDecoration(
-                      color: ok ? _green : K.red,
+                      color: ok ? _green : K.danger,
                       borderRadius: BorderRadius.circular(28),
                       boxShadow: K.shadowStrong,
                     ),
@@ -1239,7 +1235,7 @@ class _CouponToastState extends State<CouponToast> {
                             ok
                                 ? Icons.local_offer_rounded
                                 : Icons.close_rounded,
-                            color: ok ? _green : K.red,
+                            color: ok ? _green : K.danger,
                             size: 32,
                           ),
                         ),

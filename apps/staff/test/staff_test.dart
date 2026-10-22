@@ -42,7 +42,7 @@ Future<void> openShell(
   addTearDown(session.dispose);
   await tester.pumpWidget(
     MaterialApp(
-      theme: staffTheme(),
+      theme: staffTheme(ColorPalette.fallback),
       home: StaffScope(
         session: session,
         child: StaffShell(onLogout: () {}, initial: section),
@@ -188,6 +188,17 @@ void main() {
     expect(find.text('Totem'), findsOneWidget);
     expect(find.text('192.168.1.31'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('settings: a colour palette is picked and saved', (tester) async {
+    final fake = FakeServer();
+    await openShell(tester, fake, Section.settings);
+    for (final p in ColorPalette.presets) {
+      expect(find.byKey(ValueKey('palette-${p.id}')), findsOneWidget);
+    }
+    await tapKey(tester, 'palette-midnight');
+    await tapKey(tester, 'save-settings');
+    expect(fake.settings.palette, 'midnight');
   });
 
   testWidgets('menu: a product can be marked sold out', (tester) async {

@@ -80,8 +80,17 @@ oppure dal **menu staff**: tieni premuto 3 secondi l'angolo in alto a
 sinistra, inserisci il PIN staff e imposta l'indirizzo. Dallo stesso menu si
 ricarica il menu o si chiude l'app.
 
-Logo, colori e immagini sono segnaposto: i colori stanno in
-`apps/kiosk/lib/src/ui/theme.dart`, il logo e le illustrazioni dei prodotti
+**Colori**: si sceglie una palette da **Staff > Impostazioni > Aspetto**
+(Classico rosso e giallo, Fiamma, Steakhouse, Notte, Fresco, Oceano, Frutti
+di bosco, Trattoria). Il server la invia a totem, app staff e schermo
+ritiro, che cambiano colore subito senza riavvio e senza far perdere la
+schermata al cliente; anche il logo segnaposto e le illustrazioni "mangio
+qui / porto via" si ricolorano. Errori, annullamenti e ordini in ritardo
+restano sempre rossi. Le palette sono in
+`packages/kiosk_core/lib/src/palette.dart`: per aggiungerne una basta un
+nuovo blocco nella lista `presets`.
+
+Logo e immagini sono segnaposto: il logo e le illustrazioni dei prodotti
 demo sono serviti dal server (`server/lib/src/illustrations.dart`) finché il
 locale non carica le proprie foto. Il font è Poppins (licenza OFL, incluso). Le
 traduzioni dell'interfaccia sono in `apps/kiosk/lib/src/i18n.dart`: per
@@ -116,8 +125,9 @@ programma Windows) con accesso tramite PIN staff e una barra laterale:
 - **Sconti**: codici sconto (vedi sotto), con utilizzi, stato, QR code e
   codice a barre da stampare.
 - **Impostazioni**: modalità demo, lingue, "mangio qui / porto via",
-  flusso dell'ordine con verifica immediata delle combinazioni, dispositivi
-  (POS, registratore telematico, stampanti) e PIN.
+  palette colori con anteprima del totem, flusso dell'ordine con verifica
+  immediata delle combinazioni, dispositivi (POS, registratore telematico,
+  stampanti) e PIN.
 
 ```sh
 cd apps/staff

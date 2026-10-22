@@ -134,18 +134,18 @@ class _Header extends StatelessWidget {
                             ? Icons.restaurant_rounded
                             : Icons.shopping_bag_rounded,
                         size: 20,
-                        color: K.red,
+                        color: K.primary,
                       ),
                       const SizedBox(width: 6),
                       Text(
                         t(k.serviceMode.name),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
-                          color: K.red,
+                          color: K.primary,
                         ),
                       ),
-                      const Icon(Icons.expand_more_rounded, color: K.red),
+                      Icon(Icons.expand_more_rounded, color: K.primary),
                     ],
                   ),
                 ),
@@ -188,7 +188,7 @@ class _CouponButton extends StatelessWidget {
           children: [
             Icon(
               applied ? Icons.verified_rounded : Icons.local_offer_rounded,
-              color: applied ? Colors.white : K.red,
+              color: applied ? Colors.white : K.primary,
               size: 26,
             ),
             const SizedBox(width: 8),
@@ -238,12 +238,12 @@ class _CategoryRail extends StatelessWidget {
                 curve: Curves.easeOutCubic,
                 padding: const EdgeInsets.fromLTRB(8, 12, 8, 14),
                 decoration: BoxDecoration(
-                  color: selected ? K.red : Colors.transparent,
+                  color: selected ? K.primary : Colors.transparent,
                   borderRadius: BorderRadius.circular(22),
                   boxShadow: selected
                       ? [
                           BoxShadow(
-                            color: K.red.withValues(alpha: 0.35),
+                            color: K.primary.withValues(alpha: 0.35),
                             blurRadius: 18,
                             offset: const Offset(0, 8),
                           ),
@@ -417,7 +417,7 @@ class _PromoBanner extends StatelessWidget {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: K.yellow,
+                              color: K.accent,
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -445,8 +445,8 @@ class _PromoBanner extends StatelessWidget {
                             children: [
                               Text(
                                 context.money(product.priceCents),
-                                style: const TextStyle(
-                                  color: K.yellow,
+                                style: TextStyle(
+                                  color: K.accent,
                                   fontSize: 28,
                                   fontWeight: FontWeight.w900,
                                 ),
@@ -502,7 +502,7 @@ class _ProductCardState extends State<ProductCard> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(K.radius),
           boxShadow: K.shadow,
-          border: count > 0 ? Border.all(color: K.red, width: 3) : null,
+          border: count > 0 ? Border.all(color: K.primary, width: 3) : null,
         ),
         child: Stack(
           children: [
@@ -595,7 +595,7 @@ class _ProductCardState extends State<ProductCard> {
                               key: ValueKey('quick-add-${p.id}'),
                               icon: Icons.add_rounded,
                               size: 54,
-                              color: K.red,
+                              color: K.primary,
                               foreground: Colors.white,
                               onTap: () =>
                                   MenuScreen.quickAdd(context, p, _imageKey),
@@ -617,7 +617,7 @@ class _ProductCardState extends State<ProductCard> {
                     vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: K.yellow,
+                    color: K.accent,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(
@@ -639,8 +639,8 @@ class _ProductCardState extends State<ProductCard> {
                           width: 40,
                           height: 40,
                           alignment: Alignment.center,
-                          decoration: const BoxDecoration(
-                            color: K.red,
+                          decoration: BoxDecoration(
+                            color: K.primary,
                             shape: BoxShape.circle,
                           ),
                           child: Text(
@@ -777,7 +777,7 @@ class _OrderBarState extends State<OrderBar>
                       ),
                       child: Badge(
                         isLabelVisible: !empty,
-                        backgroundColor: K.red,
+                        backgroundColor: K.primary,
                         offset: const Offset(-8, -8),
                         label: Text(
                           '${k.itemCount}',
@@ -792,7 +792,7 @@ class _OrderBarState extends State<OrderBar>
                           height: 72,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: empty ? K.background : K.yellow,
+                            color: empty ? K.background : K.accent,
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -869,7 +869,7 @@ class _OrderBarState extends State<OrderBar>
                         height: 76,
                         padding: const EdgeInsets.symmetric(horizontal: 28),
                         decoration: BoxDecoration(
-                          color: K.yellow,
+                          color: K.accent,
                           borderRadius: BorderRadius.circular(38),
                         ),
                         child: Row(

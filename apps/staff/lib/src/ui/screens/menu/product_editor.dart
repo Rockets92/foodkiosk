@@ -397,7 +397,7 @@ class _ProductEditorState extends State<_ProductEditor> {
         if (_p != null)
           TextButton.icon(
             key: const ValueKey('delete-product'),
-            style: TextButton.styleFrom(foregroundColor: S.red),
+            style: TextButton.styleFrom(foregroundColor: S.primary),
             onPressed: _busy ? null : _delete,
             icon: const Icon(Icons.delete_outline_rounded),
             label: const Text('Elimina'),

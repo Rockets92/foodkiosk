@@ -258,7 +258,7 @@ class _ResultRow extends StatelessWidget {
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
-            color: ok ? S.success : S.red,
+            color: ok ? S.success : S.primary,
           ),
         ),
       ],

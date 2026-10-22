@@ -73,7 +73,7 @@ class _AttractScreenState extends State<AttractScreen>
       child: Material(
         type: MaterialType.transparency,
         child: DecoratedBox(
-          decoration: const BoxDecoration(gradient: K.heroGradient),
+          decoration: BoxDecoration(gradient: K.heroGradient),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -141,9 +141,9 @@ class _AttractScreenState extends State<AttractScreen>
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
+                              Icon(
                                     Icons.qr_code_scanner_rounded,
-                                    color: K.yellow,
+                                    color: K.accent,
                                     size: 30,
                                   )
                                   .animate(onPlay: (c) => c.repeat())
@@ -230,7 +230,7 @@ class _Featured extends StatelessWidget {
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
-                        color: K.yellow,
+                        color: K.accent,
                         borderRadius: BorderRadius.circular(30),
                         boxShadow: K.shadowStrong,
                       ),
@@ -267,8 +267,8 @@ class _Featured extends StatelessWidget {
           ),
           child: Text(
             price,
-            style: const TextStyle(
-              color: K.yellow,
+            style: TextStyle(
+              color: K.accent,
               fontSize: 34,
               fontWeight: FontWeight.w900,
             ),
@@ -288,7 +288,7 @@ class _Cta extends StatelessWidget {
     return Container(
           padding: const EdgeInsets.symmetric(horizontal: 56, vertical: 30),
           decoration: BoxDecoration(
-            color: K.yellow,
+            color: K.accent,
             borderRadius: BorderRadius.circular(60),
             boxShadow: const [
               BoxShadow(

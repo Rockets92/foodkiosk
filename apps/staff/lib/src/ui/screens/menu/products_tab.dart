@@ -220,10 +220,10 @@ class _ProductTile extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             session.money(p.priceCents),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 18,
-                              color: S.red,
+                              color: S.primary,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -235,7 +235,7 @@ class _ProductTile extends StatelessWidget {
                                 if (!p.badge.isEmpty)
                                   Pill(p.badge.resolve('it'), color: S.warning),
                                 if (p.soldOut)
-                                  const Pill('Esaurito', color: S.red),
+                                  Pill('Esaurito', color: S.primary),
                                 if (!p.enabled)
                                   const Pill('Nascosto', color: S.muted),
                                 if (p.trackStock)

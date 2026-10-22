@@ -66,9 +66,9 @@ class _MenuScreenState extends State<MenuScreen>
               controller: _tabs,
               isScrollable: true,
               tabAlignment: TabAlignment.start,
-              labelColor: S.red,
+              labelColor: S.primary,
               unselectedLabelColor: S.inkSoft,
-              indicatorColor: S.red,
+              indicatorColor: S.primary,
               dividerColor: S.line,
               labelStyle: const TextStyle(
                 fontFamily: 'Poppins',

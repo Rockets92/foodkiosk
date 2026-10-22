@@ -140,7 +140,11 @@ class _KitchenScreenState extends State<KitchenScreen> {
           if (_error != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Pill(_error!, color: S.red, icon: Icons.wifi_off_rounded),
+              child: Pill(
+                _error!,
+                color: S.danger,
+                icon: Icons.wifi_off_rounded,
+              ),
             ),
           Expanded(
             child: _loading
@@ -218,7 +222,7 @@ class _Header extends StatelessWidget {
           const SizedBox(width: 12),
           Text('Cucina', style: ST.h1.copyWith(color: fg)),
           const SizedBox(width: 12),
-          Pill('$count ordini', color: dark ? S.yellow : S.red),
+          Pill('$count ordini', color: dark ? S.accent : S.primary),
           const Spacer(),
           _Clock(color: fg),
           const SizedBox(width: 16),
@@ -383,7 +387,7 @@ class _Ticket extends StatelessWidget {
     final waitColor = minutes < 5
         ? S.success
         : late
-        ? S.red
+        ? S.danger
         : S.warning;
     final (action, icon) = switch (order.kitchenStatus) {
       KitchenStatus.queued => ('Inizia', Icons.play_arrow_rounded),
@@ -396,7 +400,7 @@ class _Ticket extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: late ? Border.all(color: S.red, width: 2) : null,
+        border: late ? Border.all(color: S.danger, width: 2) : null,
         boxShadow: S.shadow,
       ),
       child: Column(
@@ -458,7 +462,7 @@ class _Ticket extends StatelessWidget {
                         TextSpan(
                           text: '${l.quantity}× ',
                           style: TextStyle(
-                            color: S.red,
+                            color: S.primary,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
@@ -483,10 +487,10 @@ class _Ticket extends StatelessWidget {
                       padding: const EdgeInsets.only(left: 28),
                       child: Text(
                         '“$note”',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontStyle: FontStyle.italic,
-                          color: S.red,
+                          color: S.primary,
                         ),
                       ),
                     ),

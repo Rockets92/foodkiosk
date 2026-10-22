@@ -130,7 +130,7 @@ class DiscountsSection extends StatelessWidget {
                       child: Text(
                         'Scegli almeno un modo per inserire i codici, '
                         'oppure spegnili.',
-                        style: ST.small.copyWith(color: S.red),
+                        style: ST.small.copyWith(color: S.danger),
                       ).animate().shake(hz: 4, duration: 400.ms),
                     ),
                   if (v.scanner || v.atCounter) const _ScannerHelp(),
@@ -288,7 +288,7 @@ class _ScannerHelpState extends State<_ScannerHelp> {
                             fontWeight: FontWeight.w700,
                             color: DiscountCode.isValidCode(code)
                                 ? S.success
-                                : S.red,
+                                : S.danger,
                           ),
                         ).animate(key: ValueKey(read)).fadeIn().slideX(),
                       ),

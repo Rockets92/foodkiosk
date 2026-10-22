@@ -89,7 +89,7 @@ class _Waiting extends StatelessWidget {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: K.red.withValues(alpha: 0.5),
+                          color: K.primary.withValues(alpha: 0.5),
                           width: 6,
                         ),
                       ),
@@ -103,7 +103,7 @@ class _Waiting extends StatelessWidget {
                       curve: Curves.easeOut,
                     )
                     .fadeOut(delay: (i * 600).ms, duration: 1800.ms),
-              const Illustration('pos', size: 380)
+              const Illustration('pos', size: 380, recolor: false)
                   .animate(onPlay: (c) => c.repeat(reverse: true))
                   .rotate(begin: -0.01, end: 0.01, duration: 1200.ms),
             ],
@@ -111,10 +111,10 @@ class _Waiting extends StatelessWidget {
         ),
         Text(t('followTerminal'), textAlign: TextAlign.center, style: KText.h1),
         const SizedBox(height: 28),
-        const Icon(
+        Icon(
               Icons.keyboard_double_arrow_down_rounded,
               size: 96,
-              color: K.red,
+              color: K.primary,
             )
             .animate(onPlay: (c) => c.repeat(reverse: true))
             .moveY(
@@ -123,7 +123,7 @@ class _Waiting extends StatelessWidget {
               duration: 700.ms,
               curve: Curves.easeInOut,
             ),
-        Text(t('posBelow'), style: KText.h3.copyWith(color: K.red)),
+        Text(t('posBelow'), style: KText.h3.copyWith(color: K.primary)),
       ],
     );
   }
@@ -141,14 +141,14 @@ class _Failed extends StatelessWidget {
         Container(
           width: 200,
           height: 200,
-          decoration: const BoxDecoration(
-            color: Color(0xFFFFE9E5),
+          decoration: BoxDecoration(
+            color: K.dangerSoft,
             shape: BoxShape.circle,
           ),
           child: const Icon(
             Icons.credit_card_off_rounded,
             size: 110,
-            color: K.red,
+            color: K.danger,
           ),
         ).animate().shake(hz: 5, duration: 600.ms),
         const SizedBox(height: 28),

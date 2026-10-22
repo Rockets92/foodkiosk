@@ -8,6 +8,7 @@ import '../../api.dart';
 import '../../session.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'settings/appearance_section.dart';
 import 'settings/devices_section.dart';
 import 'settings/discounts_section.dart';
 import 'settings/flow_section.dart';
@@ -27,6 +28,7 @@ class SettingsScreen extends StatefulWidget {
 enum _Part {
   demo('Modalità demo', Icons.science_rounded),
   general('Generale', Icons.storefront_rounded),
+  appearance('Aspetto', Icons.palette_rounded),
   flow('Flusso ordine', Icons.alt_route_rounded),
   discounts('Codici sconto', Icons.local_offer_rounded),
   devices('Dispositivi', Icons.devices_other_rounded),
@@ -231,6 +233,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final sections = <_Part, Widget>{
       _Part.demo: DemoSection(demo: s.demoMode, onChanged: _toggleDemo),
       _Part.general: GeneralSection(s: s, set: _set),
+      _Part.appearance: AppearanceSection(
+        selected: s.palette,
+        venueName: s.venueName,
+        onChanged: (id) => _set('palette', id),
+      ),
       _Part.flow: FlowSection(
         flow: s.flow,
         presets: _presets,
@@ -409,7 +416,7 @@ class _SaveBar extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.edit_note_rounded, color: S.yellow),
+                    Icon(Icons.edit_note_rounded, color: S.accent),
                     const SizedBox(width: 12),
                     const Expanded(
                       child: Text(

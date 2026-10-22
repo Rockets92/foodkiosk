@@ -14,7 +14,7 @@ class VenueLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox.square(
     dimension: size,
-    child: const NetImage('/media/placeholder/logo.svg'),
+    child: const NetImage('/media/placeholder/logo.svg', recolor: true),
   );
 }
 
@@ -61,7 +61,7 @@ class LanguageSwitcher extends StatelessWidget {
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: k.language == code
-                        ? (dark ? K.red : Colors.white)
+                        ? (dark ? K.primary : Colors.white)
                         : (dark ? Colors.white : K.inkSoft),
                   ),
                 ),
@@ -99,8 +99,8 @@ class DemoBadge extends StatelessWidget {
                 Container(
                       width: 10,
                       height: 10,
-                      decoration: const BoxDecoration(
-                        color: K.yellow,
+                      decoration: BoxDecoration(
+                        color: K.accent,
                         shape: BoxShape.circle,
                       ),
                     )
@@ -197,7 +197,7 @@ Future<bool> confirmDialog(BuildContext context, String question) async {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.help_outline_rounded, size: 72, color: K.red),
+                Icon(Icons.help_outline_rounded, size: 72, color: K.primary),
                 const SizedBox(height: 16),
                 Text(question, textAlign: TextAlign.center, style: KText.h2),
                 const SizedBox(height: 32),

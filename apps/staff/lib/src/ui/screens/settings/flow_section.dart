@@ -204,11 +204,11 @@ class _PresetCard extends StatelessWidget {
     final (title, text, icon) =
         presetInfo[name] ?? (name, '', Icons.tune_rounded);
     return Material(
-      color: selected ? S.red.withValues(alpha: 0.07) : Colors.white,
+      color: selected ? S.primary.withValues(alpha: 0.07) : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: selected ? S.red : S.line,
+          color: selected ? S.primary : S.line,
           width: selected ? 2 : 1.5,
         ),
       ),
@@ -223,12 +223,12 @@ class _PresetCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Icon(icon, color: selected ? S.red : S.inkSoft),
+                  Icon(icon, color: selected ? S.primary : S.inkSoft),
                   const Spacer(),
                   if (selected)
-                    const Icon(
+                    Icon(
                       Icons.check_circle_rounded,
-                      color: S.red,
+                      color: S.primary,
                       size: 20,
                     ),
                 ],
@@ -293,7 +293,7 @@ class _Cycle extends StatelessWidget {
                       children: [
                         CircleAvatar(
                           radius: 16,
-                          backgroundColor: S.red,
+                          backgroundColor: S.primary,
                           child: Icon(icon, color: Colors.white, size: 18),
                         ),
                         const SizedBox(width: 10),
@@ -368,7 +368,7 @@ class _Matrix extends StatelessWidget {
           ),
           for (final e in FlowEvent.values)
             TableRow(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(top: BorderSide(color: S.line)),
               ),
               children: [
@@ -442,7 +442,7 @@ class _Issues extends StatelessWidget {
   }
 
   static Color _color(FlowIssueLevel l) => switch (l) {
-    FlowIssueLevel.error => S.red,
+    FlowIssueLevel.error => S.primary,
     FlowIssueLevel.warning => S.warning,
     FlowIssueLevel.info => S.info,
   };

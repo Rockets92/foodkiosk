@@ -479,7 +479,7 @@ class DiscountTicket extends StatelessWidget {
   });
 
   static Color colorOf(DiscountType t) => switch (t) {
-    DiscountType.percent => S.red,
+    DiscountType.percent => S.primary,
     DiscountType.amount => const Color(0xFF2F6FEB),
     DiscountType.freeProduct => S.success,
   };
