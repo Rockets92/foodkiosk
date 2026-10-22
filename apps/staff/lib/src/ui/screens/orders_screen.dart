@@ -8,6 +8,8 @@ import '../../api.dart';
 import '../../session.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/payment_dialog.dart';
+import 'new_order_view.dart';
 
 enum _Filter {
   toCollect('Da incassare'),
@@ -45,6 +47,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
   String _search = '';
   String? _selectedId;
   DateTime _day = DateTime.now();
+  bool _composing = false;
+  Order? _editing;
   StreamSubscription<ServerEvent>? _sub;
   Timer? _timer;
 
@@ -137,6 +141,35 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final selected = _orders.where((o) => o.id == _selectedId).firstOrNull;
     final toCollect = _orders.where(_Filter.toCollect.matches).length;
 
+    if (_composing) {
+      return Scaffold(
+        body: NewOrderView(
+          editing: _editing,
+          onCancel: () => setState(() {
+            _composing = false;
+            _editing = null;
+          }),
+          onDone: (order, message) {
+            setState(() {
+              _composing = false;
+              _editing = null;
+              _day = DateTime.now();
+              _filter = _Filter.all;
+              _search = '';
+              _selectedId = order.id;
+              _orders = [
+                order,
+                for (final o in _orders)
+                  if (o.id != order.id) o,
+              ];
+            });
+            showMessage(context, message);
+            _load();
+          },
+        ),
+      );
+    }
+
     return Scaffold(
       key: const ValueKey('orders'),
       body: Row(
@@ -150,9 +183,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 PageHeader(
                   title: 'Cassa',
                   subtitle: _isToday
-                      ? 'Ordini di oggi · $toCollect da incassare'
+                      ? 'Oggi · $toCollect da incassare'
                       : 'Ordini del ${_day.day}/${_day.month}/${_day.year}',
                   actions: [
+                    FilledButton.icon(
+                      key: const ValueKey('orders-new'),
+                      onPressed: () => setState(() {
+                        _editing = null;
+                        _composing = true;
+                      }),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Nuovo ordine'),
+                    ),
                     OutlinedButton.icon(
                       key: const ValueKey('orders-day'),
                       onPressed: _pickDay,
@@ -213,7 +255,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       ? const EmptyState(
                           icon: Icons.receipt_long_rounded,
                           title: 'Nessun ordine',
-                          message: 'I nuovi ordini dai totem compaiono qui.',
+                          message: 'Qui compaiono gli ordini dai totem e quelli fatti in cassa.',
                         )
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(28, 4, 28, 24),
@@ -250,6 +292,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       key: ValueKey(selected.id),
                       order: selected,
                       onChanged: _replace,
+                      onEdit: () => setState(() {
+                        _editing = selected;
+                        _composing = true;
+                      }),
                     ),
             ),
           ),
@@ -338,6 +384,10 @@ class _OrderRow extends StatelessWidget {
                             style: ST.h3,
                           ),
                         ),
+                        if (order.origin == OrderOrigin.counter) ...[
+                          const SizedBox(width: 6),
+                          const Pill('CASSA', color: S.info),
+                        ],
                         if (order.isDemo) ...[
                           const SizedBox(width: 6),
                           const Pill('DEMO', color: S.warning),
@@ -379,8 +429,14 @@ class _OrderRow extends StatelessWidget {
 class _OrderDetail extends StatefulWidget {
   final Order order;
   final ValueChanged<Order> onChanged;
+  final VoidCallback onEdit;
 
-  const _OrderDetail({super.key, required this.order, required this.onChanged});
+  const _OrderDetail({
+    super.key,
+    required this.order,
+    required this.onChanged,
+    required this.onEdit,
+  });
 
   @override
   State<_OrderDetail> createState() => _OrderDetailState();
@@ -431,11 +487,25 @@ class _OrderDetailState extends State<_OrderDetail> {
     }
   }
 
-  Future<void> _collect(String method) {
+  /// Unpaid, at the till, not yet in the kitchen: items can still change.
+  bool get _canEdit =>
+      order.status == OrderStatus.open &&
+      order.paymentStatus == PaymentStatus.awaitingCounter &&
+      order.kitchenStatus == KitchenStatus.none;
+
+  Future<void> _collect() async {
     final api = context.staffRead.api;
-    return _run(
-      () => api.markPaid(order.id, method: method, issueFiscal: _issueFiscal),
-      'Ordine ${orderNumber(order.number)} incassato',
+    final payment = await showPaymentDialog(
+      context,
+      totalCents: order.totalCents,
+    );
+    if (payment == null || !mounted) return;
+    await _run(
+      () => api.markPaid(order.id, payment: payment, issueFiscal: _issueFiscal),
+      payment.receivedCents != null
+          ? 'Ordine ${orderNumber(order.number)} incassato · resto '
+                '${context.staffRead.money(payment.receivedCents! - order.totalCents)}'
+          : 'Ordine ${orderNumber(order.number)} incassato',
     );
   }
 
@@ -560,32 +630,28 @@ class _OrderDetailState extends State<_OrderDetail> {
                       children: [
                         Expanded(
                           child: FilledButton.icon(
-                            key: const ValueKey('pay-cash'),
+                            key: const ValueKey('pay-open'),
                             style: FilledButton.styleFrom(
                               backgroundColor: S.success,
                               minimumSize: const Size.fromHeight(64),
                             ),
-                            onPressed: _busy ? null : () => _collect('cash'),
-                            icon: const Icon(Icons.payments_rounded),
-                            label: Text(
-                              'Incassato in contanti · '
-                              '${money(order.totalCents)}',
-                            ),
+                            onPressed: _busy ? null : _collect,
+                            icon: const Icon(Icons.point_of_sale_rounded),
+                            label: Text('Incassa · ${money(order.totalCents)}'),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton.icon(
-                            key: const ValueKey('pay-card'),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: S.info,
-                              minimumSize: const Size.fromHeight(64),
+                        if (_canEdit) ...[
+                          const SizedBox(width: 12),
+                          OutlinedButton.icon(
+                            key: const ValueKey('edit-order'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 64),
                             ),
-                            onPressed: _busy ? null : () => _collect('card'),
-                            icon: const Icon(Icons.credit_card_rounded),
-                            label: const Text('Incassato con carta'),
+                            onPressed: _busy ? null : widget.onEdit,
+                            icon: const Icon(Icons.add_shopping_cart_rounded),
+                            label: const Text('Aggiungi prodotti'),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -755,6 +821,7 @@ class _InfoGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = order.payment;
+    final money = context.staff.money;
     final items = <(IconData, String, String)>[
       (
         Icons.account_balance_wallet_rounded,
@@ -766,7 +833,10 @@ class _InfoGrid extends StatelessWidget {
           Icons.credit_card_rounded,
           'Incasso',
           [
-            _method(p.provider),
+            if (p.provider == 'mixed' || p.receivedCents != null)
+              paymentSummary(p, money)
+            else
+              _method(p.provider),
             if (p.cardBrand != null) p.cardBrand!,
             if (p.maskedPan != null) p.maskedPan!,
             if (p.authCode != null) 'aut. ${p.authCode}',
@@ -867,6 +937,8 @@ class _HistoryTile extends StatelessWidget {
 
     return switch (e.type) {
       'created' => ('Ordine creato', S.info),
+      'createdAtCounter' => ('Ordine fatto in cassa', S.info),
+      'edited' => ('Prodotti modificati in cassa', S.info),
       'paymentStarted' => ('Pagamento avviato sul totem', S.info),
       'paymentFailed' => (
         'Pagamento rifiutato${e.detail == null ? '' : ': ${e.detail}'}',

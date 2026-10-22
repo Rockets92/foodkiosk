@@ -67,14 +67,16 @@ Finché il lavoro non è unito a `main`, dopo il `git clone` esegui
    **+** (vola nel carrello), apri un menu e scegli contorno e bibita,
    poi *Ordina* → *Conferma ordine*. Compare il numero d'ordine.
 2. **Staff → Cassa**: l'ordine è tra quelli *Da incassare*; aprilo e tocca
-   *Incassato in contanti*.
+   *Incassato in contanti*. Con **Nuovo ordine** puoi anche fare un ordine
+   per un cliente al banco e incassarlo subito.
 3. **Staff → Cucina**: l'ordine compare da solo; *Inizia* → *Pronto*.
 4. **Staff → Ritiro**: il numero è nella colonna *Pronto! Ritira qui*.
    In cucina tocca *Consegnato* e sparisce.
-5. **Staff → Impostazioni → Flusso ordine**: scegli *Servizio completo* e
-   salva. Ora il totem fa pagare con il POS simulato e "emette" il
+5. **Staff → Impostazioni → Flusso ordine**: qui scegli come lavora il
+   locale. Scegli *Servizio completo* e salva. Ora il totem fa pagare con il POS simulato e "emette" il
    documento fiscale; con *Solo ordine* stampa solo lo scontrino da portare
-   in cassa.
+   in cassa, e Cucina e Ritiro spariscono dal menu staff perché la cucina
+   lavora con un altro sistema.
 6. **Staff → Menu**: cambia un prezzo, carica una foto o segna un prodotto
    come esaurito: il totem si aggiorna subito.
 7. **Staff → Riepilogo**: incasso, ordini e prodotti più venduti del giorno.

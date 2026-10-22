@@ -57,7 +57,19 @@ class OrderService {
   // ---------------------------------------------------------------------
   // Creation
 
-  Future<Order> create(OrderRequest req) async {
+  /// A kiosk order, or with [origin] counter one the cashier enters for a
+  /// customer at the till: always paid at the counter and, when
+  /// [payMethod] is given, paid on the spot (before the "submitted"
+  /// actions run, so the ticket prints as paid).
+  Future<Order> create(
+    OrderRequest req, {
+    OrderOrigin origin = OrderOrigin.kiosk,
+    String? payMethod,
+    Cents? cashCents,
+    Cents? cardCents,
+    Cents? receivedCents,
+    bool issueFiscal = true,
+  }) async {
     final s = _s;
     if (req.lines.isEmpty) {
       throw ApiException.badRequest('emptyOrder', 'The order has no items.');
@@ -72,46 +84,81 @@ class OrderService {
         ? req.language
         : s.defaultLanguage;
 
-    final paymentMode = switch (s.flow.paymentMode) {
-      PaymentMode.customerChoice => switch (req.paymentChoice) {
-        PaymentMode.kiosk => PaymentMode.kiosk,
-        PaymentMode.counter => PaymentMode.counter,
-        _ => throw ApiException.badRequest(
-          'paymentChoiceRequired',
-          'Choose whether to pay on the kiosk or at the counter.',
-        ),
-      },
-      final mode => mode,
-    };
+    final paymentMode = origin == OrderOrigin.counter
+        ? PaymentMode.counter
+        : switch (s.flow.paymentMode) {
+            PaymentMode.customerChoice => switch (req.paymentChoice) {
+              PaymentMode.kiosk => PaymentMode.kiosk,
+              PaymentMode.counter => PaymentMode.counter,
+              _ => throw ApiException.badRequest(
+                'paymentChoiceRequired',
+                'Choose whether to pay on the kiosk or at the counter.',
+              ),
+            },
+            final mode => mode,
+          };
 
     final menu = _menu.loadForKiosk();
     final lines = [
       for (final l in req.lines) _priceLine(menu, l, req.serviceMode),
     ];
+    final payment = payMethod == null
+        ? null
+        : _counterPayment(
+            lines.fold(0, (sum, l) => sum + l.totalCents),
+            method: payMethod,
+            cashCents: cashCents,
+            cardCents: cardCents,
+            receivedCents: receivedCents,
+          );
 
     final order = _db.transaction(() {
       final now = _clock();
       if (s.enforcesStock) _takeStock(lines);
-      final order = Order(
-        id: newId(),
-        number: _orders.nextNumber(now),
-        createdAt: now,
-        serviceMode: req.serviceMode,
-        language: language,
-        lines: lines,
-        paymentMode: paymentMode,
-        paymentStatus: switch (paymentMode) {
-          PaymentMode.kiosk => PaymentStatus.awaitingKiosk,
-          PaymentMode.counter => PaymentStatus.awaitingCounter,
-          _ => PaymentStatus.notRequired,
-        },
-        isDemo: s.demoMode,
-      ).withEvent('created', at: now);
+      final order =
+          Order(
+            id: newId(),
+            number: _orders.nextNumber(now),
+            createdAt: now,
+            serviceMode: req.serviceMode,
+            language: language,
+            lines: lines,
+            paymentMode: paymentMode,
+            paymentStatus: switch (paymentMode) {
+              PaymentMode.kiosk => PaymentStatus.awaitingKiosk,
+              PaymentMode.counter => PaymentStatus.awaitingCounter,
+              _ => PaymentStatus.notRequired,
+            },
+            isDemo: s.demoMode,
+            origin: origin,
+          ).withEvent(
+            origin == OrderOrigin.counter ? 'createdAtCounter' : 'created',
+            at: now,
+          );
       _orders.insert(order);
       return order;
     });
     _bus.emit(ServerEvent.orderCreated, order.toJson());
-    return _complete(await _runEvent(order, FlowEvent.submitted));
+    if (payment == null) {
+      return _complete(await _runEvent(order, FlowEvent.submitted));
+    }
+    var paid = _save(
+      order
+          .copyWith(paymentStatus: PaymentStatus.paid, payment: payment)
+          .withEvent('paid', detail: payMethod),
+    );
+    final submitted = s.flow.actionsFor(FlowEvent.submitted);
+    paid = await _runEvent(paid, FlowEvent.submitted);
+    paid = await _runEvent(
+      paid,
+      FlowEvent.paid,
+      skip: {
+        if (!issueFiscal) FlowAction.issueFiscalDocument,
+        if (submitted.contains(FlowAction.printCustomerTicket))
+          FlowAction.printCustomerTicket,
+      },
+    );
+    return _complete(paid);
   }
 
   OrderLine _priceLine(Menu menu, OrderRequestLine req, ServiceMode mode) {
@@ -334,6 +381,9 @@ class OrderService {
   Future<Order> markPaid(
     String id, {
     String method = 'counter',
+    Cents? cashCents,
+    Cents? cardCents,
+    Cents? receivedCents,
     bool issueFiscal = true,
   }) async {
     var order = get(id);
@@ -348,12 +398,16 @@ class OrderService {
         'The order is not awaiting payment (${order.paymentStatus.name}).',
       );
     }
+    final payment = _counterPayment(
+      order.totalCents,
+      method: method,
+      cashCents: cashCents,
+      cardCents: cardCents,
+      receivedCents: receivedCents,
+    );
     order = _save(
       order
-          .copyWith(
-            paymentStatus: PaymentStatus.paid,
-            payment: PaymentInfo(provider: method, at: _clock()),
-          )
+          .copyWith(paymentStatus: PaymentStatus.paid, payment: payment)
           .withEvent('paid', detail: method),
     );
     return _complete(
@@ -363,6 +417,74 @@ class OrderService {
         skip: {if (!issueFiscal) FlowAction.issueFiscalDocument},
       ),
     );
+  }
+
+  /// A payment taken at the till: `cash` (with the cash handed over, to
+  /// work out the change), `card`, or `mixed` (part cash, part card).
+  PaymentInfo _counterPayment(
+    Cents total, {
+    required String method,
+    Cents? cashCents,
+    Cents? cardCents,
+    Cents? receivedCents,
+  }) {
+    Never bad(String code, String message) =>
+        throw ApiException.badRequest(code, message);
+    final (cash, card) = switch (method) {
+      'cash' => (total, null),
+      'card' => (null, total),
+      'mixed' => (cashCents, cardCents),
+      _ => (null, null),
+    };
+    if (method == 'mixed') {
+      if (cash == null || card == null || cash <= 0 || card <= 0) {
+        bad('invalidSplit', 'A mixed payment needs a cash and a card part.');
+      }
+      if (cash + card != total) {
+        bad('invalidSplit', 'Cash and card parts must add up to the total.');
+      }
+    }
+    if (receivedCents != null && (cash == null || receivedCents < cash)) {
+      bad('notEnoughCash', 'The cash received is less than the amount due.');
+    }
+    return PaymentInfo(
+      provider: method,
+      at: _clock(),
+      cashCents: cash,
+      cardCents: card,
+      receivedCents: receivedCents,
+    );
+  }
+
+  /// Changes the items of an order still waiting at the till and not yet
+  /// in the kitchen (the customer adds a drink when paying).
+  Future<Order> editLines(String id, OrderRequest req) async {
+    var order = get(id);
+    if (order.status != OrderStatus.open ||
+        order.paymentStatus != PaymentStatus.awaitingCounter ||
+        order.kitchenStatus != KitchenStatus.none) {
+      throw ApiException.conflict(
+        'notEditable',
+        'Only unpaid orders not yet in the kitchen can be changed.',
+      );
+    }
+    if (req.lines.isEmpty) {
+      throw ApiException.badRequest('emptyOrder', 'The order has no items.');
+    }
+    final mode = req.serviceMode;
+    final menu = _menu.loadForKiosk();
+    final lines = [for (final l in req.lines) _priceLine(menu, l, mode)];
+    order = _db.transaction(() {
+      _returnStock(order);
+      if (_s.enforcesStock) _takeStock(lines);
+      final edited = order
+          .copyWith(serviceMode: mode, lines: lines)
+          .withEvent('edited', at: _clock());
+      _orders.update(edited);
+      return edited;
+    });
+    _bus.emit(ServerEvent.orderUpdated, order.toJson());
+    return order;
   }
 
   // ---------------------------------------------------------------------
@@ -423,6 +545,10 @@ class OrderService {
     final valid = all.where((o) => o.status != OrderStatus.cancelled);
     final paid = valid.where((o) => o.paymentStatus == PaymentStatus.paid);
     final revenue = paid.fold(0, (s, o) => s + o.totalCents);
+    Cents cashOf(Order o) =>
+        o.payment?.cashCents ??
+        (o.payment?.provider == 'cash' ? o.totalCents : 0);
+    final cash = paid.fold(0, (s, o) => s + cashOf(o));
     final products = <String, ({String name, int qty, int cents})>{};
     final byHour = List.filled(24, 0);
     for (final o in valid) {
@@ -440,6 +566,8 @@ class OrderService {
       ..sort((a, b) => b.qty.compareTo(a.qty));
     return {
       'day': businessDay,
+      'cashCents': cash,
+      'cardCents': revenue - cash,
       'orders': valid.length,
       'cancelled': all.length - valid.length,
       'demoOrders': valid.where((o) => o.isDemo).length,

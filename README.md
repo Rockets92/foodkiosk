@@ -98,7 +98,13 @@ programma Windows) con accesso tramite PIN staff e una barra laterale:
 - **Cassa**: ordini del giorno con filtri e ricerca per numero; dettaglio
   con righe, IVA, storico; incasso in contanti o con carta (con o senza
   documento fiscale), annullamento, ristampa e nuovo tentativo delle azioni
-  fallite (per esempio stampante spenta).
+  fallite (per esempio stampante spenta). **Nuovo ordine**: il cassiere
+  compone l'ordine per un cliente al banco (varianti comprese) e lo incassa
+  subito o lo salva da incassare dopo; segue lo stesso flusso degli ordini
+  dal totem. Finché un ordine non è pagato né in cucina si possono
+  aggiungere o togliere prodotti. **Incasso**: contanti con importo
+  ricevuto e resto, carta (POS della cassa) o misto contanti + carta; il
+  riepilogo divide l'incasso tra contanti e carta.
 - **Cucina**: scontrini in tre colonne (da preparare, in preparazione,
   pronti) con tempi di attesa colorati, allergeni evidenziati, a schermo
   intero per il monitor della cucina; interruttori rapidi "esaurito".
@@ -195,6 +201,12 @@ Configurazioni pronte (`GET /api/admin/flow/presets`):
 | `payAtCounterKitchenImmediately` | Scontrino per la cassa e ordine subito in cucina. |
 | `fullService` | Pagamento con POS sul totem, documento fiscale, scontrino, cucina, schermo ritiro. |
 
+Si sceglie dall'app staff in **Impostazioni → Flusso ordine**, partendo da
+un modello pronto o impostando ogni passaggio. L'app staff mostra solo i
+moduli che il flusso usa: senza schermo cucina (per esempio con *Solo
+ordine*, quando la cucina lavora con un altro sistema) le sezioni Cucina e
+Ritiro non compaiono.
+
 Le combinazioni che lascerebbero ordini bloccati vengono rifiutate o
 segnalate (`POST /api/admin/flow/validate`): per esempio il documento fiscale
 prima del pagamento, o azioni su `paid` quando il pagamento è disattivato.
@@ -272,7 +284,9 @@ Staff e gestione (header `X-Staff-Pin`):
 | POST | `/api/kitchen/orders/<id>/status` | `queued`, `preparing`, `ready`, `collected` |
 | PATCH | `/api/kitchen/products/<id>` | Segna esaurito (`soldOut`) |
 | GET | `/api/staff/orders` | Ordini del giorno (filtri `number`, `status`, `payment`, `day`) |
-| POST | `/api/staff/orders/<id>/mark-paid` | Pagato in cassa |
+| POST | `/api/staff/orders` | Ordine fatto in cassa (`payment`: `cash`/`card`/`mixed` per incassarlo subito) |
+| PUT | `/api/staff/orders/<id>/lines` | Cambia i prodotti di un ordine non pagato e non in cucina |
+| POST | `/api/staff/orders/<id>/mark-paid` | Pagato in cassa (`method`, e `cashCents`/`cardCents`/`receivedCents` per misto e resto) |
 | POST | `/api/staff/orders/<id>/cancel` | Annulla |
 | POST | `/api/staff/orders/<id>/actions/<azione>` | Ristampa / riprova un'azione |
 | GET | `/api/staff/print-jobs` | Registro stampe (anche quelle demo) |

@@ -218,15 +218,47 @@ class StaffApi {
     ];
   }
 
+  /// An order entered at the till; with [payment] (`cash`, `card`) it is
+  /// cashed at once.
+  Future<Order> createCounterOrder(
+    OrderRequest request, {
+    CounterPayment? payment,
+    bool issueFiscal = true,
+  }) async => Order.fromJson(
+    await _map(
+      'POST',
+      '/api/staff/orders',
+      body: {
+        ...request.toJson(),
+        if (payment != null) ...{'payment': payment.method, ...payment.amounts},
+        'issueFiscal': issueFiscal,
+      },
+    ),
+  );
+
+  /// Replaces the items of an unpaid order not yet in the kitchen.
+  Future<Order> editOrderLines(String id, OrderRequest request) async =>
+      Order.fromJson(
+        await _map(
+          'PUT',
+          '/api/staff/orders/$id/lines',
+          body: request.toJson(),
+        ),
+      );
+
   Future<Order> markPaid(
     String id, {
-    required String method,
+    required CounterPayment payment,
     required bool issueFiscal,
   }) async => Order.fromJson(
     await _map(
       'POST',
       '/api/staff/orders/$id/mark-paid',
-      body: {'method': method, 'issueFiscal': issueFiscal},
+      body: {
+        'method': payment.method,
+        ...payment.amounts,
+        'issueFiscal': issueFiscal,
+      },
     ),
   );
 
@@ -311,4 +343,36 @@ class StaffApi {
   }
 
   void dispose() => _client.close();
+}
+
+/// How the customer paid at the till: `cash` (with the cash handed over,
+/// for the change), `card`, or `mixed` (part cash, part card).
+class CounterPayment {
+  final String method;
+  final Cents? cashCents;
+  final Cents? cardCents;
+  final Cents? receivedCents;
+
+  const CounterPayment.cash({this.receivedCents})
+    : method = 'cash',
+      cashCents = null,
+      cardCents = null;
+
+  const CounterPayment.card()
+    : method = 'card',
+      cashCents = null,
+      cardCents = null,
+      receivedCents = null;
+
+  const CounterPayment.mixed({
+    required Cents this.cashCents,
+    required Cents this.cardCents,
+  }) : method = 'mixed',
+       receivedCents = null;
+
+  Map<String, Object?> get amounts => {
+    'cashCents': ?cashCents,
+    'cardCents': ?cardCents,
+    'receivedCents': ?receivedCents,
+  };
 }
