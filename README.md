@@ -111,8 +111,10 @@ programma Windows) con accesso tramite PIN staff e una barra laterale:
   compone l'ordine per un cliente al banco (varianti comprese) e lo incassa
   subito o lo salva da incassare dopo; segue lo stesso flusso degli ordini
   dal totem. Finché un ordine non è pagato né in cucina si possono
-  aggiungere o togliere prodotti. **Incasso**: contanti con importo
-  ricevuto e resto, carta (POS della cassa) o misto contanti + carta; il
+  aggiungere o togliere prodotti. **Incasso**: contanti toccando le
+  banconote e le monete che dà il cliente (il resto da dare compare appena
+  si supera il totale, con i pezzi da restituire; "Togli" annulla l'ultimo,
+  tenere premuto toglie un pezzo; c'è anche il tastierino), carta (POS della cassa) o misto contanti + carta; il
   riepilogo divide l'incasso tra contanti e carta.
 - **Cucina**: scontrini in tre colonne (da preparare, in preparazione,
   pronti) con tempi di attesa colorati, allergeni evidenziati, a schermo

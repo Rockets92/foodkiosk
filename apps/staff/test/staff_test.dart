@@ -82,10 +82,12 @@ void main() {
     await openShell(tester, fake, Section.orders);
     await tapKey(tester, 'order-row-7');
     await tapKey(tester, 'pay-open');
+    await tapKey(tester, 'pay-input-keypad');
     for (final k in '1000'.split('')) {
       await tapKey(tester, 'pay-key-$k');
     }
-    expect(find.text('Mancano 5,00 €'), findsOneWidget);
+    expect(find.text('5,00 €'), findsWidgets);
+    expect(find.text('Mancano'), findsOneWidget);
     expect(
       tester
           .widget<FilledButton>(find.byKey(const ValueKey('pay-confirm')))
@@ -102,6 +104,50 @@ void main() {
     final paid = fake.orders.single;
     expect(paid.paymentStatus, PaymentStatus.paid);
     expect(paid.payment?.receivedCents, 2000);
+  });
+
+  testWidgets('the cashier taps the notes and coins handed over', (
+    tester,
+  ) async {
+    final fake = FakeServer()..orders = [makeOrder(8)];
+    await openShell(tester, fake, Section.orders);
+    await tapKey(tester, 'order-row-8');
+    await tapKey(tester, 'pay-open');
+    String result() =>
+        tester.widget<Text>(find.byKey(const ValueKey('pay-result'))).data!;
+
+    // The order costs 15 €.
+    await tapKey(tester, 'pay-cash-500');
+    await tapKey(tester, 'pay-cash-200');
+    expect(result(), '8,00 €');
+    expect(find.text('Mancano'), findsOneWidget);
+    for (final c in [500, 200]) {
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey('pay-cash-$c')),
+          matching: find.text('1'),
+        ),
+        findsOneWidget,
+        reason: 'count badge',
+      );
+    }
+    await tapKey(tester, 'pay-cash-1000');
+    expect(find.text('Resto da dare'), findsOneWidget);
+    expect(result(), '2,00 €');
+    expect(find.byKey(const ValueKey('pay-change-pieces')), findsOneWidget);
+
+    // Take the 10 € back, a 20 € comes instead, and the 2 € coin goes back.
+    await tapKey(tester, 'pay-undo');
+    expect(result(), '8,00 €');
+    await tapKey(tester, 'pay-cash-2000');
+    expect(result(), '12,00 €');
+    await tester.longPress(find.byKey(const ValueKey('pay-cash-200')));
+    await settle(tester);
+    expect(result(), '10,00 €');
+
+    await tapKey(tester, 'pay-confirm');
+    final paid = fake.orders.single;
+    expect(paid.payment?.receivedCents, 2500);
   });
 
   testWidgets('a failed print can be retried', (tester) async {
@@ -233,6 +279,7 @@ void main() {
     await tapKey(tester, 'new-order-product-cola');
     await tapKey(tester, 'new-order-pay');
     await tapKey(tester, 'pay-method-mixed');
+    await tapKey(tester, 'pay-input-keypad');
     for (final k in '500'.split('')) {
       await tapKey(tester, 'pay-key-$k');
     }
