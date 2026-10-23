@@ -34,6 +34,12 @@ ALTRI DISPOSITIVI IN RETE
   L'indirizzo esatto e i dispositivi collegati sono nell'app staff, in
   Impostazioni > Rete.
 
+STAMPANTE USB SUL TOTEM
+  Per stampare la ricevuta sulla stampante collegata al totem: nell'app
+  staff, Impostazioni > Dispositivi > Stampante scontrini cliente =
+  "Stampante del totem (USB o Windows)"; sul totem, angolo in alto a
+  sinistra + PIN > "Stampante ricevute": scegli la stampante, prova e salva.
+
 SIMULATORE CLIENTI
   simulatore\bin\FoodKioskSimulatore.exe crea ordini di prova come se
   arrivassero dai totem: chiede l'indirizzo del server e quanti ordini al

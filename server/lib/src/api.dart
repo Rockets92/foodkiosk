@@ -95,6 +95,17 @@ class Api {
     this.mediaDir,
   });
 
+  /// An order as the totem gets it, with the tickets for its own printer
+  /// (see `KioskReceiptPrinter`) as base64 ESC/POS bytes.
+  Response _kioskOrder(Order order, {int status = 200}) {
+    final receipts = orders.takeKioskReceipts(order.id);
+    return _ok({
+      ...order.toJson(),
+      if (receipts.isNotEmpty)
+        'receipts': [for (final r in receipts) base64Encode(r)],
+    }, status: status);
+  }
+
   bool _isStaff(Request req) {
     final pin = req.headers['x-staff-pin'] ?? req.url.queryParameters['pin'];
     return pin != null && pin == settings.current.adminPin;
@@ -147,21 +158,21 @@ class Api {
       ..post('/orders', (Request req) async {
         final body = await _body(req);
         final order = await orders.create(OrderRequest.fromJson(body));
-        return _ok(order.toJson(), status: 201);
+        return _kioskOrder(order, status: 201);
       })
       ..get(
         '/orders/<id>',
-        (Request _, String id) => _ok(orders.get(id).toJson()),
+        (Request _, String id) => _kioskOrder(orders.get(id)),
       )
       ..post(
         '/orders/<id>/pay',
         (Request _, String id) async =>
-            _ok((await orders.payOnKiosk(id)).toJson()),
+            _kioskOrder(await orders.payOnKiosk(id)),
       )
       ..post(
         '/orders/<id>/switch-to-counter',
         (Request _, String id) async =>
-            _ok((await orders.switchToCounter(id)).toJson()),
+            _kioskOrder(await orders.switchToCounter(id)),
       )
       ..post(
         '/orders/<id>/cancel',

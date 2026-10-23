@@ -66,6 +66,7 @@ class AdapterRegistry {
     'none': (_) => NoPrinter(),
     'demo': (o) => DemoPrinter(width: (o['width'] as num?)?.toInt() ?? 42),
     'escposNetwork': EscPosNetworkPrinter.fromOptions,
+    'kiosk': KioskReceiptPrinter.fromOptions,
   };
 
   T _build<T>(

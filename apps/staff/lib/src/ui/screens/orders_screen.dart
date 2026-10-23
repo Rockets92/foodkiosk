@@ -255,7 +255,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       ? const EmptyState(
                           icon: Icons.receipt_long_rounded,
                           title: 'Nessun ordine',
-                          message: 'Qui compaiono gli ordini dai totem e quelli fatti in cassa.',
+                          message:
+                              'Qui compaiono gli ordini dai totem e quelli fatti in cassa.',
                         )
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(28, 4, 28, 24),

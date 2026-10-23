@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:kiosk_core/kiosk_core.dart';
@@ -40,6 +41,11 @@ abstract class KioskBackend {
   /// Whether the server accepts [pin]; null when it cannot be reached.
   Future<bool?> verifyStaffPin(String pin);
 
+  /// Tickets the server left for this totem's own printer with the last
+  /// replies about order [orderId] (ESC/POS bytes); each is handed out
+  /// once.
+  List<Uint8List> takeReceipts(String orderId) => const [];
+
   /// Live notifications (menu or settings changed).
   Stream<ServerEvent> events();
 
@@ -66,6 +72,23 @@ class HttpKioskBackend extends KioskBackend {
   }) : _client = client ?? http.Client();
 
   Uri _u(String path) => baseUri.resolve(path);
+
+  final _receipts = <String, List<Uint8List>>{};
+
+  Order _order(Map<String, Object?> json) {
+    final order = Order.fromJson(json);
+    if (json['receipts'] case final List<Object?> tickets
+        when tickets.isNotEmpty) {
+      (_receipts[order.id] ??= []).addAll([
+        for (final t in tickets) base64Decode(t as String),
+      ]);
+    }
+    return order;
+  }
+
+  @override
+  List<Uint8List> takeReceipts(String orderId) =>
+      _receipts.remove(orderId) ?? const [];
 
   Future<Map<String, Object?>> _send(
     String method,
@@ -108,17 +131,16 @@ class HttpKioskBackend extends KioskBackend {
   Future<Menu> menu() async => Menu.fromJson(await _send('GET', '/api/menu'));
 
   @override
-  Future<Order> createOrder(OrderRequest request) async => Order.fromJson(
-    await _send('POST', '/api/orders', body: request.toJson()),
-  );
+  Future<Order> createOrder(OrderRequest request) async =>
+      _order(await _send('POST', '/api/orders', body: request.toJson()));
 
   @override
   Future<Order> order(String id) async =>
-      Order.fromJson(await _send('GET', '/api/orders/$id'));
+      _order(await _send('GET', '/api/orders/$id'));
 
   /// Card payments can take a while on the terminal: generous timeout.
   @override
-  Future<Order> pay(String orderId) async => Order.fromJson(
+  Future<Order> pay(String orderId) async => _order(
     await _send(
       'POST',
       '/api/orders/$orderId/pay',
@@ -127,9 +149,8 @@ class HttpKioskBackend extends KioskBackend {
   );
 
   @override
-  Future<Order> switchToCounter(String orderId) async => Order.fromJson(
-    await _send('POST', '/api/orders/$orderId/switch-to-counter'),
-  );
+  Future<Order> switchToCounter(String orderId) async =>
+      _order(await _send('POST', '/api/orders/$orderId/switch-to-counter'));
 
   @override
   Future<Order> cancel(String orderId) async =>

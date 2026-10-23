@@ -421,6 +421,48 @@ void main() {
       },
     );
 
+    test('the totem printer gets its tickets back with the order', () async {
+      await configure({
+        'flow': FlowConfig.orderOnly.toJson(),
+        'customerPrinter': {
+          'type': 'kiosk',
+          'options': {'width': 32},
+        },
+        'counterPrinter': {'type': 'demo'},
+      });
+      final order = await placeOrder([burgerMeal()]);
+      final receipts = order['receipts'] as List;
+      expect(receipts, hasLength(1));
+      final bytes = base64Decode(receipts.single as String);
+      expect(bytes.take(2), [0x1b, 0x40], reason: 'ESC/POS initialize');
+      expect(latin1.decode(bytes), contains(order['displayNumber']));
+      expect(latin1.decode(bytes), contains('Paga in cassa'));
+
+      // Handed out once: asking again gives the order alone.
+      final (_, again) = await call('GET', '/api/orders/${order['id']}');
+      expect(again['receipts'], isNull);
+      final (_, jobs) = await call(
+        'GET',
+        '/api/staff/print-jobs?orderId=${order['id']}',
+        staff: true,
+      );
+      expect(jobs['jobs'].single['printer'], 'kiosk');
+
+      // A reprint asked by staff comes out at the till.
+      final (_, reprinted) = await call(
+        'POST',
+        '/api/staff/orders/${order['id']}/actions/printCustomerTicket',
+        staff: true,
+      );
+      expect(reprinted['receipts'], isNull);
+      final (_, after) = await call(
+        'GET',
+        '/api/staff/print-jobs?orderId=${order['id']}',
+        staff: true,
+      );
+      expect([for (final j in after['jobs']) j['printer']], contains('demo'));
+    });
+
     test('invalid flows are refused', () async {
       final (status, body) = await call(
         'PUT',

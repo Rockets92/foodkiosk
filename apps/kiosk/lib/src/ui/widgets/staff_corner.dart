@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../config.dart';
 import '../scope.dart';
+import 'receipt_printer_dialog.dart';
 
 /// Invisible area in the top-left corner: a 3 second press opens the
 /// staff menu (after the PIN), to change the server address or close the
@@ -82,6 +83,21 @@ class _StaffCornerState extends State<StaffCorner> {
               }
             },
           ),
+          if (!kIsWeb)
+            SimpleDialogOption(
+              key: const ValueKey('staff-receipt-printer'),
+              child: const Text(
+                'Stampante ricevute',
+                style: TextStyle(fontSize: 22),
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await showDialog<void>(
+                  context: context,
+                  builder: (_) => ReceiptPrinterDialog(kiosk: k),
+                );
+              },
+            ),
           SimpleDialogOption(
             child: const Text('Ricarica menu', style: TextStyle(fontSize: 22)),
             onPressed: () {
