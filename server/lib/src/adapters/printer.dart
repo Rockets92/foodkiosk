@@ -122,6 +122,28 @@ class NoPrinter extends TicketPrinter {
   Future<void> printTicket(Ticket ticket) async {}
 }
 
+/// The printer attached to the totem itself (USB, or any printer installed
+/// in Windows there). The server cannot reach it: the order service encodes
+/// the ticket in ESC/POS and hands it back to the totem that placed the
+/// order, which sends it to the printer chosen in its staff menu.
+class KioskReceiptPrinter extends TicketPrinter {
+  @override
+  final int width;
+  KioskReceiptPrinter({this.width = 42});
+
+  factory KioskReceiptPrinter.fromOptions(Map<String, Object?> o) =>
+      KioskReceiptPrinter(width: (o['width'] as num?)?.toInt() ?? 42);
+
+  @override
+  String get type => 'kiosk';
+
+  Uint8List encode(Ticket ticket) => EscPosEncoder(width).encode(ticket);
+
+  @override
+  Future<void> printTicket(Ticket ticket) async =>
+      throw StateError('the totem prints this ticket itself');
+}
+
 /// Thermal printer reachable over the network (raw port 9100), speaking
 /// ESC/POS. Covers Epson TM, Star (ESC/POS mode), Custom and most
 /// generic 80mm kiosk printers with an Ethernet interface.

@@ -211,7 +211,7 @@ class FakeServer {
           'payment': ['none', 'demo'],
           'fiscal': ['none', 'demo', 'epsonRt', 'adeOnline'],
           'dcOnline': ['sandbox'],
-          'printer': ['none', 'demo', 'escposNetwork'],
+          'printer': ['none', 'demo', 'escposNetwork', 'kiosk'],
         });
       case ('GET', '/api/admin/fiscal/account'):
         return _json(fiscalStatus);

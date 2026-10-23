@@ -65,6 +65,31 @@ Il server locale avviato al primo avvio sul PC 2 resta acceso ma non
 serve: puoi chiuderlo da Gestione attività → FoodKioskServer, e dal
 riavvio successivo non parte più perché il totem punta al PC 1.
 
+### Stampante della ricevuta collegata al totem (USB)
+
+Se il totem ha una stampante termica collegata via USB (o comunque
+installata in Windows su quel PC), la ricevuta con il numero d'ordine può
+uscire lì:
+
+1. Sul PC 1, in **Food Kiosk Staff → Impostazioni → Dispositivi →
+   Stampante scontrini cliente**, scegli **Stampante del totem (USB o
+   Windows)** e la larghezza della carta (80 mm o 58 mm), poi salva.
+2. Sul totem: angolo in alto a sinistra 3 secondi → PIN → **Stampante
+   ricevute**. Scegli la stampante dall'elenco (o lascia la predefinita di
+   Windows), tocca **Stampa di prova** e controlla che esca e venga
+   tagliata, poi **Salva**.
+
+Da quel momento ogni totem stampa le ricevute dei suoi ordini: quella con
+"Paga in cassa" quando il cliente va alla cassa, quella "Pagato" quando
+paga con il POS al totem e va direttamente al ritiro. Le ristampe chieste
+dallo staff e gli ordini fatti al banco escono dalla stampante cassa. Se la
+stampa non riesce l'ordine passa lo stesso: l'errore si vede nella stessa
+schermata *Stampante ricevute* del totem.
+
+La stampa è diretta (RAW, comandi ESC/POS): funziona con i driver delle
+stampanti termiche (Epson TM, Custom, POS-80 generiche) e con il driver
+"Generic / Text Only" di Windows.
+
 ## 3. La cucina (PC 3)
 
 1. Installa con **Postazione staff** e apri **Food Kiosk Staff**.

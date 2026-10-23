@@ -202,6 +202,39 @@ void main() {
     expect(k.cart, hasLength(1));
   });
 
+  test('tickets left by the server come out of the totem printer', () async {
+    final backend =
+        FakeBackend(settings: const KioskSettings(flow: FlowConfig.fullService))
+          ..receiptsPerReply = [
+            Uint8List.fromList([0x1b, 0x40]),
+          ];
+    final printed = <Uint8List>[];
+    var fail = false;
+    final k = KioskController(
+      backend,
+      printReceipt: (t) async {
+        if (fail) throw StateError('carta finita');
+        printed.add(t);
+      },
+    );
+    await k.init();
+    k.addToCart(const CartLine(productId: 'cola'));
+    await k.submit();
+    await Future<void>.delayed(Duration.zero);
+    // One with the order, one once paid on the totem.
+    expect(printed, hasLength(2));
+    expect(printed.first, [0x1b, 0x40]);
+    expect(k.lastPrintError, isNull);
+
+    fail = true;
+    k.reset();
+    k.addToCart(const CartLine(productId: 'cola'));
+    await k.submit();
+    await Future<void>.delayed(Duration.zero);
+    expect(k.step, KioskStep.done, reason: 'a printer problem never blocks');
+    expect(k.lastPrintError, contains('carta finita'));
+  });
+
   group('discount codes', () {
     Future<void> type(WidgetTester tester, String code) async {
       for (final c in code.split('')) {

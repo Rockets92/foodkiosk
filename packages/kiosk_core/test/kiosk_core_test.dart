@@ -69,6 +69,7 @@ void main() {
       final json = const KioskSettings().toPublicJson();
       expect(json.containsKey('adminPin'), isFalse);
       expect(json.containsKey('payment'), isFalse);
+      expect(json['customerPrinter'], {'type': 'demo'}, reason: 'no options');
     });
   });
 

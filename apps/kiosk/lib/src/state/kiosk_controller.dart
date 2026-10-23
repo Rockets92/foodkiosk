@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' hide Category;
 import 'package:kiosk_core/kiosk_core.dart';
 
 import '../api/kiosk_backend.dart';
+import '../config.dart';
 import 'cart.dart';
 
 enum KioskStep { attract, start, menu, cart, payment, done }
@@ -15,7 +16,13 @@ enum LoadState { loading, ready, offline }
 class KioskController extends ChangeNotifier {
   final KioskBackend backend;
 
-  KioskController(this.backend);
+  /// Prints a ticket on the totem's own printer.
+  final Future<void> Function(Uint8List ticket) _printReceipt;
+
+  KioskController(
+    this.backend, {
+    Future<void> Function(Uint8List ticket)? printReceipt,
+  }) : _printReceipt = printReceipt ?? printOnTotem;
 
   LoadState loadState = LoadState.loading;
   KioskSettings settings = const KioskSettings();
@@ -49,8 +56,13 @@ class KioskController extends ChangeNotifier {
   /// success or shake on a refusal even when the same code comes twice.
   int couponAttempt = 0;
 
+  /// Why the last receipt did not come out of the totem's printer, for
+  /// the staff menu; null once one prints.
+  String? lastPrintError;
+
   StreamSubscription<ServerEvent>? _events;
   Timer? _retry;
+  Future<void> _printing = Future.value();
 
   // ---------------------------------------------------------------------
   // Loading
@@ -351,6 +363,7 @@ class KioskController extends ChangeNotifier {
           discountCode: couponResult?.ok ?? false ? coupon!.code : null,
         ),
       );
+      _printReceipts(order!.id);
       busy = false;
       if (order!.paymentStatus == PaymentStatus.awaitingKiosk) {
         step = KioskStep.payment;
@@ -394,6 +407,7 @@ class KioskController extends ChangeNotifier {
         // keep what we have
       }
     }
+    _printReceipts(current.id);
     busy = false;
     if (order!.paymentStatus == PaymentStatus.paid) {
       errorKey = null;
@@ -419,6 +433,7 @@ class KioskController extends ChangeNotifier {
     notifyListeners();
     try {
       order = await backend.switchToCounter(current.id);
+      _printReceipts(current.id);
       errorKey = null;
       step = KioskStep.done;
     } on BackendException catch (e) {
@@ -426,6 +441,23 @@ class KioskController extends ChangeNotifier {
     }
     busy = false;
     notifyListeners();
+  }
+
+  /// Sends the tickets the server left for this totem to its printer, one
+  /// after the other, without holding up the customer: a printer problem
+  /// only shows in the staff menu.
+  void _printReceipts(String orderId) {
+    for (final ticket in backend.takeReceipts(orderId)) {
+      _printing = _printing.then((_) async {
+        try {
+          await _printReceipt(ticket);
+          lastPrintError = null;
+        } catch (e) {
+          lastPrintError = '$e';
+          debugPrint('Receipt not printed: $e');
+        }
+      });
+    }
   }
 
   String _errorKeyFor(BackendException e) {

@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'windows_printer.dart';
+
 const _serverKey = 'serverUrl';
 
 /// Server address: the one saved from the staff menu, else the
@@ -69,4 +71,37 @@ Future<bool> offlinePinMatches(String pin) async {
     saved = null;
   }
   return pin == (saved ?? '1234');
+}
+
+const _receiptPrinterKey = 'receiptPrinter';
+
+/// The Windows printer chosen in the staff menu for the customer's
+/// receipt; null means the Windows default printer.
+Future<String?> loadReceiptPrinter() async {
+  try {
+    return (await SharedPreferences.getInstance()).getString(
+      _receiptPrinterKey,
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
+Future<void> saveReceiptPrinter(String? name) async {
+  final prefs = await SharedPreferences.getInstance();
+  if (name == null) {
+    await prefs.remove(_receiptPrinterKey);
+  } else {
+    await prefs.setString(_receiptPrinterKey, name);
+  }
+}
+
+/// Prints a ticket the server left for this totem (ESC/POS bytes) on the
+/// chosen printer, else on the Windows default one.
+Future<void> printOnTotem(Uint8List ticket) async {
+  final printer = await loadReceiptPrinter() ?? defaultPrinter();
+  if (printer == null) {
+    throw StateError('Nessuna stampante scelta e nessuna predefinita');
+  }
+  await printRaw(printer, ticket);
 }

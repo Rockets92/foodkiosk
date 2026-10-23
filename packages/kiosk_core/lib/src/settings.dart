@@ -244,5 +244,7 @@ class KioskSettings {
     'counterFallback': counterFallback,
     'discounts': discounts.toJson(),
     'palette': palette,
+    // Only the type: the totem prints itself when it is 'kiosk'.
+    'customerPrinter': {'type': customerPrinter.type},
   };
 }

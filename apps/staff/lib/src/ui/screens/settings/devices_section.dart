@@ -10,6 +10,7 @@ const adapterNames = {
   'none': 'Nessuno',
   'demo': 'Simulato',
   'escposNetwork': 'Stampante termica di rete (ESC/POS)',
+  'kiosk': 'Stampante del totem (USB o Windows)',
   'epsonRt': 'Registratore telematico Epson (RT)',
   'adeOnline': 'Documento commerciale online (Agenzia delle Entrate)',
 };
@@ -17,6 +18,7 @@ const adapterNames = {
 /// Options a new adapter type starts with.
 const _defaults = <String, Map<String, Object?>>{
   'escposNetwork': {'host': '', 'port': 9100, 'width': 42},
+  'kiosk': {'width': 42},
   'epsonRt': {
     'host': '',
     'port': 80,
@@ -106,7 +108,13 @@ class DevicesSection extends StatelessWidget {
               id: key,
               title: title,
               icon: icon,
-              types: {...?adapters[kind], config.type}.toList(),
+              types: {
+                ...?adapters[kind]?.where(
+                  // Only the customer's ticket can come out of the totem.
+                  (t) => t != 'kiosk' || key == 'customerPrinter',
+                ),
+                config.type,
+              }.toList(),
               config: config,
               onChanged: (c) => onChanged(key, c),
             ),
@@ -198,6 +206,45 @@ class DeviceCard extends StatelessWidget {
                 onChanged: (v) => _set('width', v),
               ),
             ),
+          ),
+        ),
+      ],
+      if (config.type == 'kiosk') ...[
+        SizedBox(
+          width: 200,
+          child: DropdownButtonHideUnderline(
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Larghezza carta',
+                isDense: true,
+              ),
+              child: DropdownButton<int>(
+                key: ValueKey('$id-width'),
+                isDense: true,
+                isExpanded: true,
+                value: switch ((o['width'] as num?)?.toInt()) {
+                  32 => 32,
+                  48 => 48,
+                  _ => 42,
+                },
+                items: const [
+                  DropdownMenuItem(value: 32, child: Text('58 mm (32)')),
+                  DropdownMenuItem(value: 42, child: Text('80 mm (42)')),
+                  DropdownMenuItem(value: 48, child: Text('80 mm (48)')),
+                ],
+                onChanged: (v) => _set('width', v),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(
+          width: 520,
+          child: Text(
+            'Ogni totem stampa le ricevute dei suoi ordini sulla stampante '
+            'scelta nel suo menu staff (angolo in alto a sinistra → '
+            'Stampante ricevute). Le ristampe e gli ordini al banco escono '
+            'dalla stampante cassa.',
+            style: ST.small,
           ),
         ),
       ],

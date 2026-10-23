@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:kiosk_core/kiosk_core.dart';
 
 import 'adapters/fiscal.dart';
@@ -30,6 +32,10 @@ class OrderService {
   /// Orders with a kiosk payment in flight, to refuse double charges.
   final _charging = <String>{};
 
+  /// Tickets for the totem's own printer, by order, until the totem that
+  /// placed the order collects them with the reply to its request.
+  final _kioskReceipts = <String, List<Uint8List>>{};
+
   OrderService(
     this._db,
     this._menu,
@@ -57,6 +63,11 @@ class OrderService {
 
   Order get(String id) =>
       _orders.byId(id) ?? (throw ApiException.notFound('Order'));
+
+  /// Tickets the totem has to print for order [id]; each is handed out
+  /// once.
+  List<Uint8List> takeKioskReceipts(String id) =>
+      _kioskReceipts.remove(id) ?? const [];
 
   // ---------------------------------------------------------------------
   // Creation
@@ -870,11 +881,22 @@ class OrderService {
       order.history.lastOrNull?.type == 'action' &&
       order.history.last.detail == FlowAction.issueFiscalDocument.name;
 
+  /// The totem's own printer only serves the totem while it waits for the
+  /// reply: reprints asked by staff and orders entered at the till come out
+  /// at the till.
+  TicketPrinter _customerPrinter(Order order, {bool manual = false}) {
+    final printer = _settings.customerPrinter;
+    return printer is KioskReceiptPrinter &&
+            (manual || order.origin != OrderOrigin.kiosk)
+        ? _settings.counterPrinter
+        : printer;
+  }
+
   /// Fiscal documents of orders paid at the till come out at the till.
   TicketPrinter _fiscalPrinter(Order order) =>
       order.paymentMode == PaymentMode.counter
       ? _settings.counterPrinter
-      : _settings.customerPrinter;
+      : _customerPrinter(order);
 
   Future<Order> _execute(
     Order order,
@@ -901,7 +923,7 @@ class OrderService {
             await _print(
               order,
               'customer',
-              _settings.customerPrinter,
+              _customerPrinter(order, manual: manual),
               customerTicket(order, _s),
             );
           }
@@ -957,7 +979,15 @@ class OrderService {
     }
     final text = ticket.toPlainText(printer.width);
     try {
-      await printer.printTicket(ticket);
+      if (printer is KioskReceiptPrinter) {
+        (_kioskReceipts[order.id] ??= []).add(printer.encode(ticket));
+        // Never collected (the totem lost the reply): oldest dropped.
+        while (_kioskReceipts.length > 50) {
+          _kioskReceipts.remove(_kioskReceipts.keys.first);
+        }
+      } else {
+        await printer.printTicket(ticket);
+      }
     } catch (e) {
       _printJobs.insert(
         printer: printer.type,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:kiosk_app/src/api/kiosk_backend.dart';
 import 'package:kiosk_core/kiosk_core.dart';
@@ -124,6 +125,20 @@ class FakeBackend extends KioskBackend {
   final List<OrderRequest> requests = [];
   final List<String> cancelled = [];
 
+  /// Tickets the fake server leaves for the totem's printer with each
+  /// order it creates or gets paid.
+  List<Uint8List> receiptsPerReply = const [];
+  final _receipts = <String, List<Uint8List>>{};
+
+  Order _withReceipts(Order order) {
+    (_receipts[order.id] ??= []).addAll(receiptsPerReply);
+    return order;
+  }
+
+  @override
+  List<Uint8List> takeReceipts(String orderId) =>
+      _receipts.remove(orderId) ?? const [];
+
   /// Codes the fake server knows.
   final Map<String, DiscountCode> discounts = {
     for (final c in testDiscounts) c.code: c,
@@ -198,7 +213,7 @@ class FakeBackend extends KioskBackend {
         null => null,
       },
     );
-    return _orders[order.id] = order;
+    return _withReceipts(_orders[order.id] = order);
   }
 
   @override
@@ -207,8 +222,10 @@ class FakeBackend extends KioskBackend {
   @override
   Future<Order> pay(String orderId) async {
     final ok = paymentResults.isEmpty ? true : paymentResults.removeAt(0);
-    return _orders[orderId] = _orders[orderId]!.copyWith(
-      paymentStatus: ok ? PaymentStatus.paid : PaymentStatus.failed,
+    return _withReceipts(
+      _orders[orderId] = _orders[orderId]!.copyWith(
+        paymentStatus: ok ? PaymentStatus.paid : PaymentStatus.failed,
+      ),
     );
   }
 
