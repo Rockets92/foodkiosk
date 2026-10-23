@@ -322,9 +322,8 @@ class DeviceCard extends StatelessWidget {
           ],
           if (config.type != 'none')
             Theme(
-              data: Theme.of(
-                context,
-              ).copyWith(dividerColor: Colors.transparent),
+              data: Theme.of(context)
+                  .copyWith(dividerColor: Colors.transparent),
               child: ExpansionTile(
                 tilePadding: EdgeInsets.zero,
                 title: const Text('Avanzate (JSON)', style: ST.small),
