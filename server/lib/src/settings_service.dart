@@ -6,6 +6,7 @@ import 'adapters/printer.dart';
 import 'adapters/registry.dart';
 import 'errors.dart';
 import 'event_bus.dart';
+import 'fiscal_account.dart';
 import 'repositories.dart';
 
 /// Holds the current settings and the adapters built from them.
@@ -14,13 +15,17 @@ class SettingsService {
   final AdapterRegistry registry;
   final EventBus _bus;
 
+  /// The Agenzia delle Entrate account used by the `adeOnline` device.
+  final FiscalAccount? account;
+
   late KioskSettings _settings;
   late PaymentTerminal _payment;
   late FiscalDevice _fiscal;
   late TicketPrinter _customerPrinter;
   late TicketPrinter _kitchenPrinter;
+  late TicketPrinter _counterPrinter;
 
-  SettingsService(this._repo, this.registry, this._bus) {
+  SettingsService(this._repo, this.registry, this._bus, {this.account}) {
     _apply(_repo.load());
   }
 
@@ -34,6 +39,17 @@ class SettingsService {
   TicketPrinter get customerPrinter => _customerPrinter;
   TicketPrinter get kitchenPrinter => _kitchenPrinter;
 
+  /// Printer at the till; the customer printer when none is set.
+  TicketPrinter get counterPrinter =>
+      _counterPrinter.type == 'none' ? _customerPrinter : _counterPrinter;
+
+  /// The fiscal device configured for production, also in demo mode: to
+  /// check the account before going live.
+  FiscalDevice configuredFiscal() => registry.buildFiscal(
+    _settings.fiscal,
+    FiscalContext(merchant: _settings.merchant, account: account),
+  );
+
   void _apply(KioskSettings s) {
     final payment = s.demoMode
         ? registry.buildPayment(
@@ -41,15 +57,22 @@ class SettingsService {
           )
         : registry.buildPayment(s.payment);
     final fiscal = s.demoMode
-        ? registry.buildFiscal(AdapterConfig.demo)
-        : registry.buildFiscal(s.fiscal);
+        // Demo tickets look like the configured device's: printed by the
+        // RT, or by the suite.
+        ? DemoFiscalDevice(printsDocument: s.fiscal.type == 'epsonRt')
+        : registry.buildFiscal(
+            s.fiscal,
+            FiscalContext(merchant: s.merchant, account: account),
+          );
     final customerPrinter = registry.buildPrinter(s.customerPrinter);
     final kitchenPrinter = registry.buildPrinter(s.kitchenPrinter);
+    final counterPrinter = registry.buildPrinter(s.counterPrinter);
     _settings = s;
     _payment = payment;
     _fiscal = fiscal;
     _customerPrinter = customerPrinter;
     _kitchenPrinter = kitchenPrinter;
+    _counterPrinter = counterPrinter;
   }
 
   KioskSettings update(KioskSettings next) {

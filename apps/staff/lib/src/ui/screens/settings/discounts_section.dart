@@ -66,7 +66,7 @@ class DiscountsSection extends StatelessWidget {
                   LayoutBuilder(
                     builder: (context, box) {
                       final cards = [
-                        _ModeCard(
+                        ModeCard(
                           key: const ValueKey('discounts-manual'),
                           icon: Icons.keyboard_rounded,
                           title: 'Tastiera sul totem',
@@ -77,7 +77,7 @@ class DiscountsSection extends StatelessWidget {
                           onTap: () =>
                               onChanged(_with(manualEntry: !v.manualEntry)),
                         ),
-                        _ModeCard(
+                        ModeCard(
                           key: const ValueKey('discounts-scanner'),
                           icon: Icons.qr_code_scanner_rounded,
                           title: 'Lettore QR / barcode',
@@ -88,7 +88,7 @@ class DiscountsSection extends StatelessWidget {
                           selected: v.scanner,
                           onTap: () => onChanged(_with(scanner: !v.scanner)),
                         ),
-                        _ModeCard(
+                        ModeCard(
                           key: const ValueKey('discounts-counter'),
                           icon: Icons.point_of_sale_rounded,
                           title: 'In cassa',
@@ -141,13 +141,14 @@ class DiscountsSection extends StatelessWidget {
   }
 }
 
-class _ModeCard extends StatelessWidget {
+/// A selectable card: icon, title and a line of explanation.
+class ModeCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String text;
   final bool selected;
   final VoidCallback onTap;
-  const _ModeCard({
+  const ModeCard({
     super.key,
     required this.icon,
     required this.title,

@@ -1,4 +1,5 @@
 import 'discount.dart';
+import 'fiscal.dart';
 import 'flow.dart';
 import 'order.dart';
 import 'palette.dart';
@@ -24,6 +25,11 @@ class AdapterConfig {
 
   Map<String, Object?> toJson() => {'type': type, 'options': options};
 }
+
+final _secretOption = RegExp(
+  r'password|pin|secret|apikey|token',
+  caseSensitive: false,
+);
 
 class KioskSettings {
   final String venueName;
@@ -61,6 +67,13 @@ class KioskSettings {
   final AdapterConfig customerPrinter;
   final AdapterConfig kitchenPrinter;
 
+  /// Printer at the till, for the fiscal documents of orders paid there.
+  /// With `none` they come out of [customerPrinter].
+  final AdapterConfig counterPrinter;
+
+  /// Business details printed on the fiscal documents.
+  final MerchantProfile merchant;
+
   /// PIN for the admin panel and the staff endpoints.
   final String adminPin;
 
@@ -86,6 +99,8 @@ class KioskSettings {
     this.fiscal = AdapterConfig.none,
     this.customerPrinter = AdapterConfig.demo,
     this.kitchenPrinter = AdapterConfig.none,
+    this.counterPrinter = AdapterConfig.none,
+    this.merchant = const MerchantProfile(),
     this.adminPin = '1234',
     this.palette = 'classic',
   });
@@ -134,6 +149,18 @@ class KioskSettings {
         'The flow issues fiscal documents but no fiscal device is set.',
       );
     }
+    // The suite prints these documents itself, so it needs the seller's
+    // details; an RT has them in its own header.
+    if (!demoMode && fiscal.type == 'adeOnline') {
+      errors.addAll(merchant.validate());
+    }
+    final secret = fiscal.options.keys.where(_secretOption.hasMatch);
+    if (secret.isNotEmpty) {
+      errors.add(
+        'Credentials ("${secret.first}") cannot be stored in the device '
+        'options: enter them in the Agenzia delle Entrate section.',
+      );
+    }
     return errors;
   }
 
@@ -178,6 +205,11 @@ class KioskSettings {
         json['kitchenPrinter'],
         d.kitchenPrinter,
       ),
+      counterPrinter: AdapterConfig.fromJson(
+        json['counterPrinter'],
+        d.counterPrinter,
+      ),
+      merchant: MerchantProfile.fromJson(json['merchant']),
       adminPin: json['adminPin'] as String? ?? d.adminPin,
       palette: json['palette'] as String? ?? d.palette,
     );
@@ -191,6 +223,8 @@ class KioskSettings {
     'fiscal': fiscal.toJson(),
     'customerPrinter': customerPrinter.toJson(),
     'kitchenPrinter': kitchenPrinter.toJson(),
+    'counterPrinter': counterPrinter.toJson(),
+    'merchant': merchant.toJson(),
     'adminPin': adminPin,
   };
 

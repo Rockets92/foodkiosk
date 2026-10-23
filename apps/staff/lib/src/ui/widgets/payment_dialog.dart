@@ -7,16 +7,20 @@ import '../theme.dart';
 
 /// Asks how the customer pays [totalCents] at the till: cash (with the
 /// change worked out), card on the venue's terminal, or part each.
+///
+/// With [fiscal] (a documento commerciale is issued) the cashier can also
+/// add the customer's lottery code or tax code.
 Future<CounterPayment?> showPaymentDialog(
   BuildContext context, {
   required Cents totalCents,
+  bool fiscal = false,
 }) {
   final session = context.staffRead;
   return showDialog<CounterPayment>(
     context: context,
     builder: (_) => StaffScope(
       session: session,
-      child: _PaymentDialog(total: totalCents),
+      child: _PaymentDialog(total: totalCents, fiscal: fiscal),
     ),
   );
 }
@@ -25,7 +29,8 @@ enum _Method { cash, card, mixed }
 
 class _PaymentDialog extends StatefulWidget {
   final Cents total;
-  const _PaymentDialog({required this.total});
+  final bool fiscal;
+  const _PaymentDialog({required this.total, required this.fiscal});
 
   @override
   State<_PaymentDialog> createState() => _PaymentDialogState();
@@ -39,11 +44,25 @@ class _PaymentDialogState extends State<_PaymentDialog> {
 
   Cents get _total => widget.total;
 
-  bool get _valid => switch (_method) {
-    _Method.cash => _typed == 0 || _typed >= _total,
-    _Method.card => true,
-    _Method.mixed => _typed > 0 && _typed < _total,
-  };
+  String _lottery = '';
+  String _taxCode = '';
+  bool _showCustomer = false;
+
+  /// The receipts lottery only takes electronic payments.
+  bool get _lotteryAllowed => _method != _Method.cash;
+
+  FiscalCustomer get _customer => FiscalCustomer.fromJson({
+    if (_lotteryAllowed) 'lotteryCode': _lottery,
+    'taxCode': _taxCode,
+  });
+
+  bool get _valid =>
+      _customer.validate().isEmpty &&
+      switch (_method) {
+        _Method.cash => _typed == 0 || _typed >= _total,
+        _Method.card => true,
+        _Method.mixed => _typed > 0 && _typed < _total,
+      };
 
   /// Quick amounts: the exact total, the next whole euro and the notes
   /// that cover it.
@@ -74,13 +93,80 @@ class _PaymentDialogState extends State<_PaymentDialog> {
     Navigator.pop(context, switch (_method) {
       _Method.cash => CounterPayment.cash(
         receivedCents: _typed == 0 ? null : _typed,
+        customer: _customer,
       ),
-      _Method.card => const CounterPayment.card(),
+      _Method.card => CounterPayment.card(customer: _customer),
       _Method.mixed => CounterPayment.mixed(
         cashCents: _typed,
         cardCents: _total - _typed,
+        customer: _customer,
       ),
     });
+  }
+
+  /// Lottery code and buyer's tax code for the documento commerciale.
+  Widget _customerFields() {
+    final lotteryOk =
+        _lottery.isEmpty || TaxId.isValidLotteryCode(_lottery.trim());
+    final cfOk =
+        _taxCode.isEmpty ||
+        TaxId.isValidTaxCode(_taxCode.trim()) ||
+        TaxId.isValidVatNumber(_taxCode.trim());
+    if (!_showCustomer) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          key: const ValueKey('pay-fiscal-customer'),
+          onPressed: () => setState(() => _showCustomer = true),
+          icon: const Icon(Icons.confirmation_number_outlined),
+          label: const Text('Codice lotteria o codice fiscale del cliente'),
+        ),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        border: Border.all(color: S.line, width: 1.5),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Sul documento commerciale', style: ST.h3),
+          const SizedBox(height: 10),
+          TextField(
+            key: const ValueKey('pay-lottery'),
+            enabled: _lotteryAllowed,
+            textCapitalization: TextCapitalization.characters,
+            maxLength: 8,
+            decoration: InputDecoration(
+              labelText: 'Codice lotteria',
+              counterText: '',
+              helperText: _lotteryAllowed
+                  ? 'Gli 8 caratteri del codice del cliente'
+                  : 'Vale solo per i pagamenti con carta',
+              errorText: lotteryOk || !_lotteryAllowed
+                  ? null
+                  : 'Servono 8 lettere o cifre',
+            ),
+            onChanged: (v) => setState(() => _lottery = v),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            key: const ValueKey('pay-taxcode'),
+            textCapitalization: TextCapitalization.characters,
+            maxLength: 16,
+            decoration: InputDecoration(
+              labelText: 'Codice fiscale o P.IVA del cliente',
+              counterText: '',
+              helperText: 'Solo se il cliente lo chiede',
+              errorText: cfOk ? null : 'Codice non valido',
+            ),
+            onChanged: (v) => setState(() => _taxCode = v),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -180,6 +266,10 @@ class _PaymentDialogState extends State<_PaymentDialog> {
                   ),
                 const SizedBox(height: 12),
                 _Keypad(onKey: _key),
+              ],
+              if (widget.fiscal) ...[
+                const SizedBox(height: 4),
+                _customerFields(),
               ],
               const SizedBox(height: 8),
             ],

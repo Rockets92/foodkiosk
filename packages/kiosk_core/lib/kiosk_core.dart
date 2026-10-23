@@ -7,6 +7,7 @@ library;
 export 'src/allergen.dart';
 export 'src/discount.dart';
 export 'src/events.dart';
+export 'src/fiscal.dart';
 export 'src/flow.dart';
 export 'src/localized_text.dart';
 export 'src/menu.dart';

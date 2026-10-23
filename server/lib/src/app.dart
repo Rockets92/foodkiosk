@@ -6,9 +6,11 @@ import 'database.dart';
 import 'demo_data.dart';
 import 'discount_service.dart';
 import 'event_bus.dart';
+import 'fiscal_account.dart';
 import 'menu_service.dart';
 import 'order_service.dart';
 import 'repositories.dart';
+import 'secrets.dart';
 import 'settings_service.dart';
 
 /// Wires the server together; used by `bin/server.dart` and by the tests.
@@ -21,6 +23,7 @@ class KioskApp {
   final OrderService orders;
   final DiscountService discounts;
   final PrintJobRepository printJobs;
+  final FiscalAccount fiscalAccount;
   final Handler handler;
 
   KioskApp._(
@@ -32,6 +35,7 @@ class KioskApp {
     this.orders,
     this.discounts,
     this.printJobs,
+    this.fiscalAccount,
     this.handler,
   );
 
@@ -42,13 +46,23 @@ class KioskApp {
     Handler? mediaHandler,
     String? mediaDir,
     DateTime Function()? clock,
+    SecretStore? secrets,
   }) {
     final bus = EventBus();
     final reg = registry ?? AdapterRegistry();
     final menuRepo = MenuRepository(db);
     final printJobs = PrintJobRepository(db);
-    final settings = SettingsService(SettingsRepository(db), reg, bus)
-      ..ensureInitialized();
+    final account = FiscalAccount(
+      secrets ?? SecretStore.ephemeral(db),
+      db,
+      clock: clock,
+    );
+    final settings = SettingsService(
+      SettingsRepository(db),
+      reg,
+      bus,
+      account: account,
+    )..ensureInitialized();
     final discountRepo = DiscountRepository(db);
     if (seedDemo && menuRepo.isEmpty) {
       seedDemoMenu(menuRepo);
@@ -78,6 +92,7 @@ class KioskApp {
       orders: orders,
       discounts: discounts,
       printJobs: printJobs,
+      fiscalAccount: account,
       registry: reg,
       bus: bus,
       mediaHandler: mediaHandler,
@@ -92,6 +107,7 @@ class KioskApp {
       orders,
       discounts,
       printJobs,
+      account,
       api.handler,
     );
   }

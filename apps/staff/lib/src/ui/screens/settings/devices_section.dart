@@ -11,6 +11,7 @@ const adapterNames = {
   'demo': 'Simulato',
   'escposNetwork': 'Stampante termica di rete (ESC/POS)',
   'epsonRt': 'Registratore telematico Epson (RT)',
+  'adeOnline': 'Documento commerciale online (Agenzia delle Entrate)',
 };
 
 /// Options a new adapter type starts with.
@@ -46,13 +47,6 @@ class DevicesSection extends StatelessWidget {
         s.payment,
       ),
       (
-        'fiscal',
-        'fiscal',
-        'Documento fiscale',
-        Icons.receipt_rounded,
-        s.fiscal,
-      ),
-      (
         'customerPrinter',
         'printer',
         'Stampante scontrini cliente',
@@ -66,11 +60,20 @@ class DevicesSection extends StatelessWidget {
         Icons.soup_kitchen_rounded,
         s.kitchenPrinter,
       ),
+      (
+        'counterPrinter',
+        'printer',
+        'Stampante cassa (documenti degli ordini pagati in cassa)',
+        Icons.point_of_sale_rounded,
+        s.counterPrinter,
+      ),
     ];
     return SectionCard(
       icon: Icons.devices_other_rounded,
       title: 'Dispositivi',
-      subtitle: 'POS, registratore telematico e stampanti termiche',
+      subtitle:
+          'POS e stampanti termiche. Il registratore telematico è nella '
+          'sezione Agenzia delle Entrate',
       accent: S.info,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -98,7 +101,7 @@ class DevicesSection extends StatelessWidget {
               ),
             ),
           for (final (key, kind, title, icon, config) in devices)
-            _DeviceCard(
+            DeviceCard(
               key: ValueKey('device-$key'),
               id: key,
               title: title,
@@ -113,7 +116,8 @@ class DevicesSection extends StatelessWidget {
   }
 }
 
-class _DeviceCard extends StatelessWidget {
+/// One pluggable device: its type and the options of that type.
+class DeviceCard extends StatelessWidget {
   final String id;
   final String title;
   final IconData icon;
@@ -121,7 +125,10 @@ class _DeviceCard extends StatelessWidget {
   final AdapterConfig config;
   final ValueChanged<AdapterConfig> onChanged;
 
-  const _DeviceCard({
+  /// Without it the type is chosen elsewhere and only the options show.
+  final bool typePicker;
+
+  const DeviceCard({
     super.key,
     required this.id,
     required this.title,
@@ -129,6 +136,7 @@ class _DeviceCard extends StatelessWidget {
     required this.types,
     required this.config,
     required this.onChanged,
+    this.typePicker = true,
   });
 
   void _set(String option, Object? value) {
@@ -225,29 +233,30 @@ class _DeviceCard extends StatelessWidget {
               Icon(icon, color: S.inkSoft),
               const SizedBox(width: 10),
               Expanded(child: Text(title, style: ST.h3)),
-              SizedBox(
-                width: 340,
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey('$id-type:${config.type}'),
-                  initialValue: config.type,
-                  isExpanded: true,
-                  decoration: const InputDecoration(isDense: true),
-                  items: [
-                    for (final t in types)
-                      DropdownMenuItem(
-                        value: t,
-                        child: Text(
-                          adapterNames[t] ?? t,
-                          overflow: TextOverflow.ellipsis,
+              if (typePicker)
+                SizedBox(
+                  width: 340,
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey('$id-type:${config.type}'),
+                    initialValue: config.type,
+                    isExpanded: true,
+                    decoration: const InputDecoration(isDense: true),
+                    items: [
+                      for (final t in types)
+                        DropdownMenuItem(
+                          value: t,
+                          child: Text(
+                            adapterNames[t] ?? t,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                  ],
-                  onChanged: (t) {
-                    if (t == null || t == config.type) return;
-                    onChanged(AdapterConfig(t, {...?_defaults[t]}));
-                  },
+                    ],
+                    onChanged: (t) {
+                      if (t == null || t == config.type) return;
+                      onChanged(AdapterConfig(t, {...?_defaults[t]}));
+                    },
+                  ),
                 ),
-              ),
             ],
           ),
           if (fields.isNotEmpty) ...[

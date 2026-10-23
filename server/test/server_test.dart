@@ -272,7 +272,8 @@ void main() {
       expect(s, 200);
       expect(paid['paymentStatus'], 'paid');
       expect(paid['kitchenStatus'], 'queued');
-      expect(paid['fiscalDocument']['number'], startsWith('DEMO-'));
+      expect(paid['fiscalDocument']['number'], matches(r'^\d{4}-\d{4}$'));
+      expect(paid['fiscalDocument']['test'], isTrue);
 
       final (s2, _) = await call('POST', '/api/orders/${order['id']}/pay');
       expect(s2, 409, reason: 'no double charge');
@@ -302,7 +303,7 @@ void main() {
       expect(order['paymentStatus'], 'paid');
       expect(order['payment']['provider'], 'cash');
       expect(order['kitchenStatus'], 'queued');
-      expect(order['fiscalDocument']['number'], startsWith('DEMO-'));
+      expect(order['fiscalDocument']['number'], matches(r'^\d{4}-\d{4}$'));
       final (_, jobs) = await call(
         'GET',
         '/api/staff/print-jobs?orderId=${order['id']}',
@@ -310,6 +311,8 @@ void main() {
       );
       expect(jobs['jobs'], hasLength(1), reason: 'one paid ticket');
       expect(jobs['jobs'][0]['content'], isNot(contains('Paga in cassa')));
+      expect(jobs['jobs'][0]['kind'], 'fiscal');
+      expect(jobs['jobs'][0]['content'], contains('DOCUMENTO COMMERCIALE'));
 
       final (s2, _) = await call(
         'POST',

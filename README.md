@@ -180,7 +180,7 @@ PIN staff, "Chiudi applicazione".
 Con `demoMode: true`:
 
 - i pagamenti sono **simulati** (nessun POS necessario), anche se un POS reale è configurato;
-- il documento fiscale è simulato (numero `DEMO-...`);
+- il documento fiscale è simulato e marcato "DEMO", con l'aspetto del sistema scelto (documento completo o promemoria del registratore);
 - le scorte non vengono controllate né scalate;
 - gli ordini sono marcati `isDemo` e i ticket riportano "DEMO - NON VALIDO";
 - le stampanti restano quelle configurate, così una demo sul totem vero stampa davvero.
@@ -279,7 +279,7 @@ nuovo significa scrivere una classe e registrarla, senza toccare il resto.
 | Tipo | Disponibili ora |
 | --- | --- |
 | Pagamento | `none`, `demo` |
-| Fiscale | `none`, `demo`, `epsonRt` (registratore telematico Epson FP-81 II RT, FP-90 III RT e compatibili, via rete) |
+| Fiscale | `none`, `demo`, `epsonRt` (registratore telematico Epson FP-81 II RT, FP-90 III RT e compatibili, via rete), `adeOnline` (documento commerciale online dell'Agenzia delle Entrate tramite intermediario, con credenziali Fisconline cifrate) |
 | Stampante | `none`, `demo` (solo registro stampe), `escposNetwork` (stampante termica ESC/POS in rete, porta 9100) |
 
 Esempio di stampante termica di rete:
@@ -300,6 +300,11 @@ pagamento in contanti o elettronico) tramite il suo servizio web
 `fpmate.cgi`; il numero del documento commerciale finisce nell'ordine.
 L'adattatore è verificato contro un dispositivo simulato: prima dell'uso in
 produzione va provato sul modello reale del locale.
+
+**Documento commerciale online** (senza registratore): procedura,
+contenuto del documento, credenziali cifrate e annulli sono descritti in
+[docs/DOCUMENTI-FISCALI.md](docs/DOCUMENTI-FISCALI.md). Si configura da
+Impostazioni → Agenzia Entrate.
 
 **POS reale**: ogni circuito (Nexi, SumUp, Ingenico, Worldline, ...) ha il
 suo protocollo o SDK, quindi l'adattatore si scrive quando il locale ha

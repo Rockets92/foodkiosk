@@ -1,5 +1,6 @@
 import 'allergen.dart';
 import 'discount.dart';
+import 'fiscal.dart';
 import 'flow.dart';
 import 'localized_text.dart';
 import 'money.dart';
@@ -229,28 +230,93 @@ class PaymentInfo {
 }
 
 class FiscalDocument {
+  /// Fiscal adapter that issued it (`epsonRt`, `adeOnline`, `demo`).
   final String provider;
+
+  /// Document number, "zzzz-nnnn" (day closure - progressive).
   final String number;
   final DateTime issuedAt;
+
+  /// Sale, or the void ("annullo") of an earlier sale.
+  final FiscalDocumentKind kind;
+
+  /// Serial of the registratore telematico, or the id the Agenzia delle
+  /// Entrate gives the online procedure ("DCW2026/1234").
+  final String? deviceId;
+
+  /// The device printed the document itself (an RT does); otherwise the
+  /// suite prints it on the ticket printer.
+  final bool printedByDevice;
+
+  /// Issued in a test environment: not valid, not sent to the Agenzia.
+  final bool test;
+
+  /// The provider's id of the document, needed to void it.
+  final String? reference;
+
+  /// Link to the document (PDF) at the provider or the Agenzia.
+  final String? url;
+  final String? lotteryCode;
+  final String? customerTaxCode;
+
+  /// For a void: the number and date of the document it cancels.
+  final String? voidsNumber;
+  final DateTime? voidsIssuedAt;
 
   const FiscalDocument({
     required this.provider,
     required this.number,
     required this.issuedAt,
+    this.kind = FiscalDocumentKind.sale,
+    this.deviceId,
+    this.printedByDevice = true,
+    this.test = false,
+    this.reference,
+    this.url,
+    this.lotteryCode,
+    this.customerTaxCode,
+    this.voidsNumber,
+    this.voidsIssuedAt,
   });
 
   factory FiscalDocument.fromJson(Map<String, Object?> json) => FiscalDocument(
     provider: json['provider'] as String,
     number: json['number'] as String,
     issuedAt: DateTime.parse(json['issuedAt'] as String),
+    kind: json['kind'] == 'void'
+        ? FiscalDocumentKind.voiding
+        : FiscalDocumentKind.sale,
+    deviceId: json['deviceId'] as String?,
+    printedByDevice: json['printedByDevice'] as bool? ?? true,
+    test: json['test'] as bool? ?? false,
+    reference: json['reference'] as String?,
+    url: json['url'] as String?,
+    lotteryCode: json['lotteryCode'] as String?,
+    customerTaxCode: json['customerTaxCode'] as String?,
+    voidsNumber: json['voidsNumber'] as String?,
+    voidsIssuedAt: json['voidsIssuedAt'] == null
+        ? null
+        : DateTime.parse(json['voidsIssuedAt'] as String),
   );
 
   Map<String, Object?> toJson() => {
     'provider': provider,
     'number': number,
     'issuedAt': issuedAt.toUtc().toIso8601String(),
+    'kind': kind == FiscalDocumentKind.voiding ? 'void' : 'sale',
+    'deviceId': ?deviceId,
+    'printedByDevice': printedByDevice,
+    'test': test,
+    'reference': ?reference,
+    'url': ?url,
+    'lotteryCode': ?lotteryCode,
+    'customerTaxCode': ?customerTaxCode,
+    'voidsNumber': ?voidsNumber,
+    'voidsIssuedAt': ?voidsIssuedAt?.toUtc().toIso8601String(),
   };
 }
+
+enum FiscalDocumentKind { sale, voiding }
 
 /// One entry of the order's audit trail.
 class OrderEvent {
@@ -297,6 +363,13 @@ class Order {
   final PaymentInfo? payment;
   final FiscalDocument? fiscalDocument;
 
+  /// The "documento commerciale di annullo" issued when a paid order with
+  /// a fiscal document is cancelled.
+  final FiscalDocument? fiscalVoid;
+
+  /// Lottery code or tax code the customer asked for at the till.
+  final FiscalCustomer fiscalCustomer;
+
   /// The discount code applied, if any.
   final OrderDiscount? discount;
   final List<OrderEvent> history;
@@ -316,6 +389,8 @@ class Order {
     this.origin = OrderOrigin.kiosk,
     this.payment,
     this.fiscalDocument,
+    this.fiscalVoid,
+    this.fiscalCustomer = const FiscalCustomer(),
     this.discount,
     this.history = const [],
   });
@@ -373,6 +448,8 @@ class Order {
     PaymentMode? paymentMode,
     PaymentInfo? payment,
     FiscalDocument? fiscalDocument,
+    FiscalDocument? fiscalVoid,
+    FiscalCustomer? fiscalCustomer,
     List<OrderEvent>? history,
   }) => _copy(
     serviceMode: serviceMode,
@@ -383,6 +460,8 @@ class Order {
     paymentMode: paymentMode,
     payment: payment,
     fiscalDocument: fiscalDocument,
+    fiscalVoid: fiscalVoid,
+    fiscalCustomer: fiscalCustomer,
     history: history,
     discount: discount,
   );
@@ -399,6 +478,8 @@ class Order {
     PaymentMode? paymentMode,
     PaymentInfo? payment,
     FiscalDocument? fiscalDocument,
+    FiscalDocument? fiscalVoid,
+    FiscalCustomer? fiscalCustomer,
     List<OrderEvent>? history,
     required OrderDiscount? discount,
   }) => Order(
@@ -416,6 +497,8 @@ class Order {
     origin: origin,
     payment: payment ?? this.payment,
     fiscalDocument: fiscalDocument ?? this.fiscalDocument,
+    fiscalVoid: fiscalVoid ?? this.fiscalVoid,
+    fiscalCustomer: fiscalCustomer ?? this.fiscalCustomer,
     discount: discount,
     history: history ?? this.history,
   );
@@ -453,6 +536,10 @@ class Order {
     fiscalDocument: json['fiscalDocument'] == null
         ? null
         : FiscalDocument.fromJson((json['fiscalDocument'] as Map).cast()),
+    fiscalVoid: json['fiscalVoid'] == null
+        ? null
+        : FiscalDocument.fromJson((json['fiscalVoid'] as Map).cast()),
+    fiscalCustomer: FiscalCustomer.fromJson(json['fiscalCustomer']),
     discount: json['discount'] == null
         ? null
         : OrderDiscount.fromJson((json['discount'] as Map).cast()),
@@ -478,6 +565,8 @@ class Order {
     'origin': origin.name,
     'payment': payment?.toJson(),
     'fiscalDocument': fiscalDocument?.toJson(),
+    'fiscalVoid': ?fiscalVoid?.toJson(),
+    if (!fiscalCustomer.isEmpty) 'fiscalCustomer': fiscalCustomer.toJson(),
     'discount': discount?.toJson(),
     'history': [for (final e in history) e.toJson()],
     'subtotalCents': subtotalCents,
