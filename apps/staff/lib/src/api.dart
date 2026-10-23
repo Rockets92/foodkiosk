@@ -1,0 +1,564 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:http/http.dart' as http;
+import 'package:kiosk_core/kiosk_core.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+
+/// Error returned by the server, with its machine-readable [code].
+class ApiError implements Exception {
+  final int status;
+  final String code;
+  final String message;
+
+  ApiError(this.status, this.code, this.message);
+
+  bool get isNetwork => status == 0;
+  bool get isUnauthorized => status == 401;
+
+  @override
+  String toString() => message;
+}
+
+/// Client for the staff and admin endpoints of the local server. Every
+/// call carries the staff PIN.
+class StaffApi {
+  final Uri baseUri;
+  final String pin;
+  final http.Client _client;
+  final Duration timeout;
+
+  StaffApi(
+    this.baseUri,
+    this.pin, {
+    http.Client? client,
+    this.timeout = const Duration(seconds: 15),
+  }) : _client = client ?? http.Client();
+
+  Uri _u(String path, [Map<String, String>? query]) {
+    final u = baseUri.resolve(path);
+    return query == null ? u : u.replace(queryParameters: query);
+  }
+
+  Future<Object?> send(
+    String method,
+    String path, {
+    Object? body,
+    Map<String, String>? query,
+    Uint8List? bytes,
+  }) async {
+    final req = http.Request(method, _u(path, query))
+      ..headers['x-staff-pin'] = pin;
+    if (bytes != null) {
+      req
+        ..headers['content-type'] = 'application/octet-stream'
+        ..bodyBytes = bytes;
+    } else {
+      req.headers['content-type'] = 'application/json';
+      if (body != null) req.body = jsonEncode(body);
+    }
+    final http.Response res;
+    try {
+      res = await http.Response.fromStream(
+        await _client.send(req).timeout(timeout),
+      );
+    } on TimeoutException {
+      throw ApiError(0, 'timeout', 'Il server non risponde');
+    } catch (e) {
+      throw ApiError(0, 'network', 'Server non raggiungibile');
+    }
+    final decoded = res.bodyBytes.isEmpty
+        ? null
+        : jsonDecode(utf8.decode(res.bodyBytes));
+    if (res.statusCode >= 400) {
+      final json = decoded is Map ? decoded : const {};
+      throw ApiError(
+        res.statusCode,
+        json['error'] as String? ?? 'error',
+        json['message'] as String? ?? 'Errore ${res.statusCode}',
+      );
+    }
+    return decoded;
+  }
+
+  Future<Map<String, Object?>> _map(
+    String method,
+    String path, {
+    Object? body,
+    Map<String, String>? query,
+  }) async =>
+      ((await send(method, path, body: body, query: query)) as Map? ?? {})
+          .cast();
+
+  /// Absolute URL for an image path coming from the menu.
+  String? imageUrl(String? path) {
+    if (path == null || path.isEmpty) return null;
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    return baseUri.resolve(path).toString();
+  }
+
+  // Settings ---------------------------------------------------------------
+
+  Future<KioskSettings> settings() async =>
+      KioskSettings.fromJson(await _map('GET', '/api/admin/settings'));
+
+  /// Public settings, readable without the PIN (palette, venue name).
+  Future<KioskSettings> publicSettings() async =>
+      KioskSettings.fromJson(await _map('GET', '/api/settings'));
+
+  /// Saves a partial or full settings object; the server validates it.
+  Future<KioskSettings> saveSettings(Map<String, Object?> patch) async =>
+      KioskSettings.fromJson(
+        await _map('PUT', '/api/admin/settings', body: patch),
+      );
+
+  Future<Map<String, FlowConfig>> flowPresets() async {
+    final json = await _map('GET', '/api/admin/flow/presets');
+    return {
+      for (final e in json.entries)
+        e.key: FlowConfig.fromJson((e.value as Map).cast()),
+    };
+  }
+
+  Future<List<FlowIssue>> validateFlow(FlowConfig flow) async {
+    final json = await _map(
+      'POST',
+      '/api/admin/flow/validate',
+      body: flow.toJson(),
+    );
+    return [
+      for (final i in json['issues'] as List? ?? const [])
+        FlowIssue.fromJson((i as Map).cast()),
+    ];
+  }
+
+  /// The server PC's LAN addresses and the devices connected right now.
+  Future<NetworkInfo> network() async =>
+      NetworkInfo.fromJson(await _map('GET', '/api/admin/network'));
+
+  /// Adapter types the server knows: `{payment: [...], fiscal: [...],
+  /// printer: [...]}`.
+  Future<Map<String, List<String>>> adapters() async {
+    final json = await _map('GET', '/api/admin/adapters');
+    return {
+      for (final e in json.entries)
+        e.key: [for (final t in e.value as List) t as String],
+    };
+  }
+
+  // Agenzia delle Entrate ------------------------------------------------
+
+  Future<FiscalAccountStatus> fiscalAccount() async =>
+      FiscalAccountStatus.fromJson(
+        await _map('GET', '/api/admin/fiscal/account'),
+      );
+
+  /// Stores the Fisconline credentials (encrypted on the server). Empty
+  /// fields keep what is stored.
+  Future<FiscalAccountStatus> saveFiscalAccount({
+    String? taxCode,
+    String? password,
+    String? pin,
+  }) async => FiscalAccountStatus.fromJson(
+    await _map(
+      'PUT',
+      '/api/admin/fiscal/account',
+      body: {'taxCode': ?taxCode, 'password': ?password, 'pin': ?pin},
+    ),
+  );
+
+  Future<FiscalAccountStatus> disconnectFiscalAccount() async =>
+      FiscalAccountStatus.fromJson(
+        await _map('DELETE', '/api/admin/fiscal/account'),
+      );
+
+  /// Logs in with the configured device; `(ok, message, status)`.
+  Future<(bool, String, FiscalAccountStatus)> checkFiscal() async {
+    final json = await _map('POST', '/api/admin/fiscal/check');
+    return (
+      json['ok'] as bool? ?? false,
+      json['message'] as String? ?? '',
+      FiscalAccountStatus.fromJson(json),
+    );
+  }
+
+  /// Voids again the fiscal document of a cancelled order.
+  Future<Order> retryFiscalVoid(String id) async =>
+      Order.fromJson(await _map('POST', '/api/staff/orders/$id/fiscal-void'));
+
+  // Menu -------------------------------------------------------------------
+
+  Future<Menu> menu() async =>
+      Menu.fromJson(await _map('GET', '/api/admin/menu'));
+
+  Future<Category> saveCategory(Category c, {bool isNew = false}) async =>
+      Category.fromJson(
+        await _map(
+          isNew ? 'POST' : 'PUT',
+          isNew ? '/api/admin/categories' : '/api/admin/categories/${c.id}',
+          body: c.toJson(),
+        ),
+      );
+
+  Future<void> deleteCategory(String id) =>
+      send('DELETE', '/api/admin/categories/$id');
+
+  Future<Product> saveProduct(Product p, {bool isNew = false}) async =>
+      Product.fromJson(
+        await _map(
+          isNew ? 'POST' : 'PUT',
+          isNew ? '/api/admin/products' : '/api/admin/products/${p.id}',
+          body: p.toJson(),
+        ),
+      );
+
+  Future<Product> patchProduct(
+    String id, {
+    bool? enabled,
+    bool? soldOut,
+    int? stockQty,
+  }) async => Product.fromJson(
+    await _map(
+      'PATCH',
+      '/api/admin/products/$id',
+      body: {'enabled': ?enabled, 'soldOut': ?soldOut, 'stockQty': ?stockQty},
+    ),
+  );
+
+  Future<void> deleteProduct(String id) =>
+      send('DELETE', '/api/admin/products/$id');
+
+  Future<ModifierGroup> saveModifierGroup(
+    ModifierGroup g, {
+    bool isNew = false,
+  }) async => ModifierGroup.fromJson(
+    await _map(
+      isNew ? 'POST' : 'PUT',
+      isNew
+          ? '/api/admin/modifier-groups'
+          : '/api/admin/modifier-groups/${g.id}',
+      body: g.toJson(),
+    ),
+  );
+
+  Future<void> deleteModifierGroup(String id) =>
+      send('DELETE', '/api/admin/modifier-groups/$id');
+
+  /// Uploads a photo and returns the URL to store as `imageUrl`.
+  Future<String> uploadImage(String fileName, Uint8List bytes) async {
+    final json = await send(
+      'POST',
+      '/api/admin/media',
+      query: {'name': fileName},
+      bytes: bytes,
+    );
+    return (json as Map)['url'] as String;
+  }
+
+  // Discount codes ---------------------------------------------------------
+
+  Future<List<DiscountCode>> discounts() async {
+    final json = await _map('GET', '/api/admin/discounts');
+    return [
+      for (final c in json['codes'] as List? ?? const [])
+        DiscountCode.fromJson((c as Map).cast()),
+    ];
+  }
+
+  Future<DiscountCode> saveDiscount(
+    DiscountCode c, {
+    bool isNew = false,
+  }) async => DiscountCode.fromJson(
+    await _map(
+      isNew ? 'POST' : 'PUT',
+      isNew ? '/api/admin/discounts' : '/api/admin/discounts/${c.id}',
+      body: c.toJson(),
+    ),
+  );
+
+  Future<void> deleteDiscount(String id) =>
+      send('DELETE', '/api/admin/discounts/$id');
+
+  Future<DiscountCode> resetDiscountUses(String id) async =>
+      DiscountCode.fromJson(
+        await _map('POST', '/api/admin/discounts/$id/reset-uses'),
+      );
+
+  /// Looks up a code the customer gives at the till.
+  Future<DiscountCode> checkDiscount(String code) async =>
+      DiscountCode.fromJson(
+        await _map('POST', '/api/staff/discounts/check', body: {'code': code}),
+      );
+
+  // Orders -----------------------------------------------------------------
+
+  Future<List<Order>> orders({String? day}) async {
+    final json = await _map('GET', '/api/staff/orders', query: {'day': ?day});
+    return [
+      for (final o in json['orders'] as List? ?? const [])
+        Order.fromJson((o as Map).cast()),
+    ];
+  }
+
+  /// An order entered at the till; with [payment] (`cash`, `card`) it is
+  /// cashed at once.
+  Future<Order> createCounterOrder(
+    OrderRequest request, {
+    CounterPayment? payment,
+    bool issueFiscal = true,
+  }) async => Order.fromJson(
+    await _map(
+      'POST',
+      '/api/staff/orders',
+      body: {
+        ...request.toJson(),
+        if (payment != null) ...{'payment': payment.method, ...payment.amounts},
+        'issueFiscal': issueFiscal,
+      },
+    ),
+  );
+
+  /// Replaces the items of an unpaid order not yet in the kitchen.
+  Future<Order> editOrderLines(String id, OrderRequest request) async =>
+      Order.fromJson(
+        await _map(
+          'PUT',
+          '/api/staff/orders/$id/lines',
+          body: request.toJson(),
+        ),
+      );
+
+  Future<Order> markPaid(
+    String id, {
+    required CounterPayment payment,
+    required bool issueFiscal,
+  }) async => Order.fromJson(
+    await _map(
+      'POST',
+      '/api/staff/orders/$id/mark-paid',
+      body: {
+        'method': payment.method,
+        ...payment.amounts,
+        'issueFiscal': issueFiscal,
+      },
+    ),
+  );
+
+  Future<Order> cancelOrder(String id, {String? reason}) async =>
+      Order.fromJson(
+        await _map(
+          'POST',
+          '/api/staff/orders/$id/cancel',
+          body: {'reason': ?reason},
+        ),
+      );
+
+  Future<Order> runAction(String id, FlowAction action) async => Order.fromJson(
+    await _map('POST', '/api/staff/orders/$id/actions/${action.name}'),
+  );
+
+  Future<Map<String, Object?>> summary({String? day}) =>
+      _map('GET', '/api/staff/summary', query: {'day': ?day});
+
+  // Kitchen ----------------------------------------------------------------
+
+  Future<List<Order>> kitchenOrders() async {
+    final json = await _map('GET', '/api/kitchen/orders');
+    return [
+      for (final o in json['orders'] as List? ?? const [])
+        Order.fromJson((o as Map).cast()),
+    ];
+  }
+
+  Future<Order> setKitchenStatus(String id, KitchenStatus status) async =>
+      Order.fromJson(
+        await _map(
+          'POST',
+          '/api/kitchen/orders/$id/status',
+          body: {'status': status.name},
+        ),
+      );
+
+  /// Public: numbers for the pickup screen.
+  Future<({List<int> preparing, List<int> ready})> pickup() async {
+    final json = await _map('GET', '/api/pickup');
+    List<int> ints(Object? l) => [for (final n in l as List? ?? []) n as int];
+    return (preparing: ints(json['preparing']), ready: ints(json['ready']));
+  }
+
+  /// Live server events (orders, menu, settings), reconnecting on loss.
+  Stream<ServerEvent> events() {
+    // The pickup-only screen has no PIN; the server lists it as such.
+    final wsUri = _u('/ws', {
+      'pin': pin,
+      'device': pin.isEmpty ? 'pickup' : 'staff',
+    }).replace(scheme: baseUri.scheme == 'https' ? 'wss' : 'ws');
+    late StreamController<ServerEvent> controller;
+    WebSocketChannel? channel;
+    Timer? retry;
+    var closed = false;
+
+    void connect() {
+      if (closed) return;
+      try {
+        channel = WebSocketChannel.connect(wsUri);
+        channel!.stream.listen(
+          (data) => controller.add(
+            ServerEvent.fromJson((jsonDecode(data as String) as Map).cast()),
+          ),
+          onDone: () => retry = Timer(const Duration(seconds: 3), connect),
+          onError: (_) {},
+          cancelOnError: true,
+        );
+      } catch (_) {
+        retry = Timer(const Duration(seconds: 3), connect);
+      }
+    }
+
+    controller = StreamController<ServerEvent>.broadcast(
+      onListen: connect,
+      onCancel: () {
+        closed = true;
+        retry?.cancel();
+        channel?.sink.close();
+      },
+    );
+    return controller.stream;
+  }
+
+  void dispose() => _client.close();
+}
+
+/// How the customer paid at the till: `cash` (with the cash handed over,
+/// for the change), `card`, or `mixed` (part cash, part card).
+class CounterPayment {
+  final String method;
+  final Cents? cashCents;
+  final Cents? cardCents;
+  final Cents? receivedCents;
+
+  /// Lottery code or tax code the customer wants on the fiscal document.
+  final FiscalCustomer customer;
+
+  const CounterPayment.cash({
+    this.receivedCents,
+    this.customer = const FiscalCustomer(),
+  }) : method = 'cash',
+       cashCents = null,
+       cardCents = null;
+
+  const CounterPayment.card({this.customer = const FiscalCustomer()})
+    : method = 'card',
+      cashCents = null,
+      cardCents = null,
+      receivedCents = null;
+
+  const CounterPayment.mixed({
+    required Cents this.cashCents,
+    required Cents this.cardCents,
+    this.customer = const FiscalCustomer(),
+  }) : method = 'mixed',
+       receivedCents = null;
+
+  /// Amounts and fiscal requests, as the server takes them.
+  Map<String, Object?> get amounts => {
+    'cashCents': ?cashCents,
+    'cardCents': ?cardCents,
+    'receivedCents': ?receivedCents,
+    if (!customer.isEmpty) 'fiscalCustomer': customer.toJson(),
+  };
+}
+
+/// The Agenzia delle Entrate account as the server reports it: never the
+/// credentials, only whether they are there and when they expire.
+class FiscalAccountStatus {
+  final bool connected;
+
+  /// Stored, but they cannot be opened (the key file changed).
+  final bool unreadable;
+  final String? taxCode;
+  final DateTime? updatedAt;
+  final DateTime? passwordExpiresAt;
+  final int? daysLeft;
+  final bool renewSoon;
+  final bool expired;
+  final bool? lastCheckOk;
+  final String? lastCheckMessage;
+  final DateTime? lastCheckAt;
+
+  const FiscalAccountStatus({
+    this.connected = false,
+    this.unreadable = false,
+    this.taxCode,
+    this.updatedAt,
+    this.passwordExpiresAt,
+    this.daysLeft,
+    this.renewSoon = false,
+    this.expired = false,
+    this.lastCheckOk,
+    this.lastCheckMessage,
+    this.lastCheckAt,
+  });
+
+  factory FiscalAccountStatus.fromJson(Map<String, Object?> json) {
+    final a = (json['account'] as Map? ?? const {}).cast<String, Object?>();
+    final check = (a['lastCheck'] as Map?)?.cast<String, Object?>();
+    DateTime? date(Object? v) => v is String ? DateTime.tryParse(v) : null;
+    return FiscalAccountStatus(
+      connected: a['connected'] as bool? ?? false,
+      unreadable: a['unreadable'] as bool? ?? false,
+      taxCode: a['taxCode'] as String?,
+      updatedAt: date(a['updatedAt']),
+      passwordExpiresAt: date(a['passwordExpiresAt']),
+      daysLeft: a['daysLeft'] as int?,
+      renewSoon: a['renewSoon'] as bool? ?? false,
+      expired: a['expired'] as bool? ?? false,
+      lastCheckOk: check?['ok'] as bool?,
+      lastCheckMessage: check?['message'] as String?,
+      lastCheckAt: date(check?['at']),
+    );
+  }
+}
+
+/// What the server PC reports about the local network.
+class NetworkInfo {
+  final String hostname;
+
+  /// This PC's LAN addresses, without port.
+  final List<String> addresses;
+  final List<ConnectedDevice> devices;
+
+  const NetworkInfo({
+    this.hostname = '',
+    this.addresses = const [],
+    this.devices = const [],
+  });
+
+  factory NetworkInfo.fromJson(Map<String, Object?> json) => NetworkInfo(
+    hostname: json['hostname'] as String? ?? '',
+    addresses: [for (final a in json['addresses'] as List? ?? []) a as String],
+    devices: [
+      for (final d in json['devices'] as List? ?? [])
+        ConnectedDevice.fromJson((d as Map).cast()),
+    ],
+  );
+}
+
+/// A totem, staff station or pickup screen with a live connection.
+class ConnectedDevice {
+  /// `totem`, `staff`, `pickup` or `other`.
+  final String kind;
+  final String address;
+  final DateTime since;
+
+  const ConnectedDevice(this.kind, this.address, this.since);
+
+  factory ConnectedDevice.fromJson(Map<String, Object?> json) =>
+      ConnectedDevice(
+        json['kind'] as String? ?? 'other',
+        json['address'] as String? ?? '',
+        DateTime.tryParse(json['since'] as String? ?? '')?.toLocal() ??
+            DateTime.now(),
+      );
+}

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3A3A42"/><stop offset="1" stop-color="#1B1B1F"/></linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC72C"/><stop offset="1" stop-color="#FF8F1F"/></linearGradient>
+  </defs>
+  <ellipse cx="190" cy="372" rx="120" ry="14" fill="#000" opacity="0.15"/>
+  <rect x="100" y="70" width="180" height="296" rx="28" fill="url(#body)"/>
+  <rect x="122" y="96" width="136" height="96" rx="10" fill="#9EE6C2"/>
+  <text x="190" y="152" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="30" fill="#1B1B1F">€</text>
+  <g fill="#55555F">
+    <rect x="124" y="212" width="38" height="26" rx="8"/><rect x="171" y="212" width="38" height="26" rx="8"/><rect x="218" y="212" width="38" height="26" rx="8"/>
+    <rect x="124" y="248" width="38" height="26" rx="8"/><rect x="171" y="248" width="38" height="26" rx="8"/><rect x="218" y="248" width="38" height="26" rx="8"/>
+    <rect x="124" y="284" width="38" height="26" rx="8"/><rect x="171" y="284" width="38" height="26" rx="8"/><rect x="218" y="284" width="38" height="26" rx="8"/>
+  </g>
+  <rect x="124" y="320" width="38" height="26" rx="8" fill="#E8331C"/><rect x="171" y="320" width="38" height="26" rx="8" fill="#FFC21A"/><rect x="218" y="320" width="38" height="26" rx="8" fill="#2EB872"/>
+  <g transform="rotate(-18 300 170)">
+    <rect x="230" y="120" width="150" height="96" rx="12" fill="url(#card)"/>
+    <rect x="250" y="146" width="30" height="22" rx="4" fill="#FFF3D6"/>
+    <rect x="250" y="186" width="100" height="8" rx="4" fill="#fff" opacity="0.7"/>
+  </g>
+</svg>
