@@ -369,4 +369,130 @@ void main() {
       expect(find.byKey(const ValueKey('new-order-code')), findsNothing);
     });
   });
+
+  group('Agenzia delle Entrate', () {
+    testWidgets('online documents: business details and the account', (
+      tester,
+    ) async {
+      final fake = FakeServer();
+      await openShell(tester, fake, Section.settings);
+      await tapKey(tester, 'fiscal-mode-adeOnline');
+      expect(find.byKey(const ValueKey('fiscal-not-in-flow')), findsOneWidget);
+      expect(find.byKey(const ValueKey('merchant-problems')), findsOneWidget);
+
+      await tester.enterText(
+        find.descendant(
+          of: find.byKey(const ValueKey('merchant-legalName')),
+          matching: find.byType(TextField),
+        ),
+        'Burger Bros S.r.l.',
+      );
+      await tester.enterText(
+        find.descendant(
+          of: find.byKey(const ValueKey('merchant-vatNumber')),
+          matching: find.byType(TextField),
+        ),
+        '01234567897',
+      );
+      for (final (k, v) in [('address', 'Via Roma 1'), ('city', 'Milano')]) {
+        await tester.enterText(
+          find.descendant(
+            of: find.byKey(ValueKey('merchant-$k')),
+            matching: find.byType(TextField),
+          ),
+          v,
+        );
+      }
+      await settle(tester);
+      expect(find.byKey(const ValueKey('merchant-problems')), findsNothing);
+
+      // Credentials are sent at once, on their own.
+      await tester.enterText(
+        find.byKey(const ValueKey('ade-taxcode')),
+        'RSSMRA80A01H501U',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('ade-password')),
+        'Segreta!2026',
+      );
+      await tester.enterText(find.byKey(const ValueKey('ade-pin')), '12345');
+      // A focused field scrolls itself back into view, under the tap.
+      FocusManager.instance.primaryFocus?.unfocus();
+      await settle(tester);
+      await tapKey(tester, 'ade-save');
+      expect(fake.fiscalCredentials, isNull, reason: 'PIN too short');
+      // Let the error message go away from the buttons.
+      await tester.pump(const Duration(seconds: 6));
+      await settle(tester);
+      await tester.enterText(
+        find.byKey(const ValueKey('ade-pin')),
+        '1234567890',
+      );
+      FocusManager.instance.primaryFocus?.unfocus();
+      await settle(tester);
+      await tapKey(tester, 'ade-save');
+      expect(fake.fiscalCredentials?['pin'], '1234567890');
+      expect(find.textContaining('Collegato ·'), findsOneWidget);
+      expect(find.byKey(const ValueKey('ade-password')), findsNothing);
+
+      await tapKey(tester, 'ade-check');
+      expect(find.byKey(const ValueKey('ade-check-result')), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 6));
+      await settle(tester);
+      await tapKey(tester, 'save-settings');
+      expect(fake.settings.fiscal.type, 'adeOnline');
+      expect(fake.settings.merchant.vatNumber, '01234567897');
+      expect(
+        fake.settings.toJson().toString(),
+        isNot(contains('Segreta')),
+        reason: 'credentials never travel with the settings',
+      );
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('the lottery code goes with a card payment', (tester) async {
+      final fake = FakeServer()
+        ..orders = [makeOrder(7)]
+        ..settings = KioskSettings(
+          fiscal: const AdapterConfig('adeOnline'),
+          flow: FlowConfig(
+            paymentMode: PaymentMode.counter,
+            rules: {
+              FlowEvent.submitted: const [FlowAction.printCustomerTicket],
+              FlowEvent.paid: const [FlowAction.issueFiscalDocument],
+            },
+          ),
+        );
+      await openShell(tester, fake, Section.orders);
+      await tapKey(tester, 'order-row-7');
+      await tapKey(tester, 'pay-open');
+      await tapKey(tester, 'pay-fiscal-customer');
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('pay-lottery')))
+            .enabled,
+        isFalse,
+        reason: 'cash takes no lottery code',
+      );
+      await tapKey(tester, 'pay-method-card');
+      await tester.enterText(find.byKey(const ValueKey('pay-lottery')), 'ab12');
+      await settle(tester);
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const ValueKey('pay-confirm')))
+            .onPressed,
+        isNull,
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('pay-lottery')),
+        'ab12cd34',
+      );
+      await settle(tester);
+      await tapKey(tester, 'pay-confirm');
+      expect(fake.payments.single['fiscalCustomer'], {
+        'lotteryCode': 'AB12CD34',
+      });
+    });
+  });
 }

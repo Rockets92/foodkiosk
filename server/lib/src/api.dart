@@ -10,10 +10,12 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf_web_socket/shelf_web_socket.dart';
 
+import 'adapters/fiscal.dart';
 import 'adapters/registry.dart';
 import 'discount_service.dart';
 import 'errors.dart';
 import 'event_bus.dart';
+import 'fiscal_account.dart';
 import 'menu_service.dart';
 import 'order_service.dart';
 import 'placeholder.dart';
@@ -72,6 +74,7 @@ class Api {
   final OrderService orders;
   final DiscountService discounts;
   final PrintJobRepository printJobs;
+  final FiscalAccount fiscalAccount;
   final AdapterRegistry registry;
   final EventBus bus;
   final Handler? mediaHandler;
@@ -85,6 +88,7 @@ class Api {
     required this.orders,
     required this.discounts,
     required this.printJobs,
+    required this.fiscalAccount,
     required this.registry,
     required this.bus,
     this.mediaHandler,
@@ -261,6 +265,7 @@ class Api {
           cardCents: body['cardCents'] as int?,
           receivedCents: body['receivedCents'] as int?,
           issueFiscal: body['issueFiscal'] as bool? ?? true,
+          fiscalCustomer: FiscalCustomer.fromJson(body['fiscalCustomer']),
         );
         return _ok(order.toJson(), status: 201);
       })
@@ -283,6 +288,7 @@ class Api {
             cardCents: body['cardCents'] as int?,
             receivedCents: body['receivedCents'] as int?,
             issueFiscal: body['issueFiscal'] as bool? ?? true,
+            fiscalCustomer: FiscalCustomer.fromJson(body['fiscalCustomer']),
           )).toJson(),
         );
       })
@@ -302,6 +308,11 @@ class Api {
           )).toJson(),
         );
       })
+      ..post(
+        '/staff/orders/<id>/fiscal-void',
+        (Request _, String id) async =>
+            _ok((await orders.retryFiscalVoid(id)).toJson()),
+      )
       ..post('/staff/orders/<id>/actions/<action>', (
         Request _,
         String id,
@@ -346,6 +357,35 @@ class Api {
         });
       })
       ..get('/admin/adapters', (Request _) => _ok(registry.describe()))
+      // The Agenzia delle Entrate account: credentials go in, only their
+      // status ever comes out.
+      ..get('/admin/fiscal/account', (Request _) => _ok(_fiscalStatus()))
+      ..put('/admin/fiscal/account', (Request req) async {
+        final body = await _body(req);
+        String? str(String k) => body[k] as String?;
+        fiscalAccount.save(
+          taxCode: str('taxCode'),
+          password: str('password'),
+          pin: str('pin'),
+          providerKeys: {
+            for (final e in (body['providerKeys'] as Map? ?? const {}).entries)
+              '${e.key}': '${e.value ?? ''}',
+          },
+        );
+        return _ok(_fiscalStatus());
+      })
+      ..delete('/admin/fiscal/account', (Request _) {
+        fiscalAccount.clear();
+        return _ok(_fiscalStatus());
+      })
+      ..post('/admin/fiscal/check', (Request _) async {
+        try {
+          final message = await settings.configuredFiscal().check();
+          return _ok({'ok': true, 'message': message, ..._fiscalStatus()});
+        } on FiscalException catch (e) {
+          return _ok({'ok': false, 'message': e.message, ..._fiscalStatus()});
+        }
+      })
       ..get('/admin/network', (Request _) async => _ok(await _network()))
       ..post('/admin/media', _upload)
       ..get('/admin/menu', (Request _) => _ok(menu.fullMenu().toJson()))
@@ -461,6 +501,11 @@ class Api {
       ],
     });
   }
+
+  Map<String, Object?> _fiscalStatus() => {
+    'device': settings.current.fiscal.type,
+    'account': fiscalAccount.status(),
+  };
 
   static String _clientOf(Request req) {
     final info = req.context['shelf.io.connection_info'];

@@ -112,8 +112,10 @@ Future<void> _serve(
   void Function(String) log,
 ) async {
   final mediaDir = Directory(p.join(dataDir.path, 'media'))..createSync();
+  final db = AppDatabase.open(p.join(dataDir.path, 'foodkiosk.db'));
   final app = KioskApp(
-    AppDatabase.open(p.join(dataDir.path, 'foodkiosk.db')),
+    db,
+    secrets: SecretStore.open(db, dataDir.path),
     seedDemo: !(opts['no-demo-menu'] as bool),
     mediaHandler: createStaticHandler(mediaDir.path),
     mediaDir: mediaDir.path,

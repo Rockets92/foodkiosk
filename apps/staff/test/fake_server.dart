@@ -105,6 +105,27 @@ class FakeServer {
   /// Bodies of the orders entered at the till.
   final counterOrders = <Map<String, Object?>>[];
 
+  /// Bodies of the payments taken on existing orders.
+  final payments = <Map<String, Object?>>[];
+
+  /// The Fisconline credentials as the staff app sent them.
+  Map<String, Object?>? fiscalCredentials;
+
+  Map<String, Object?> get fiscalStatus => {
+    'device': settings.fiscal.type,
+    'account': fiscalCredentials == null
+        ? {'connected': false}
+        : {
+            'connected': true,
+            'taxCode': 'RSS************U',
+            'updatedAt': '2026-10-01T10:00:00Z',
+            'passwordExpiresAt': '2026-12-30T10:00:00Z',
+            'daysLeft': 68,
+            'renewSoon': false,
+            'expired': false,
+          },
+  };
+
   late final client = MockClient(_handle);
 
   StaffApi api(Uri server, String pin) => _FakeApi(server, pin, client);
@@ -188,8 +209,26 @@ class FakeServer {
       case ('GET', '/api/admin/adapters'):
         return _json({
           'payment': ['none', 'demo'],
-          'fiscal': ['none', 'demo', 'epsonRt'],
+          'fiscal': ['none', 'demo', 'epsonRt', 'adeOnline'],
+          'dcOnline': ['sandbox'],
           'printer': ['none', 'demo', 'escposNetwork'],
+        });
+      case ('GET', '/api/admin/fiscal/account'):
+        return _json(fiscalStatus);
+      case ('PUT', '/api/admin/fiscal/account'):
+        if ('${body['pin']}'.length != 10) {
+          return _json({'error': 'invalidPin', 'message': 'PIN'}, 400);
+        }
+        fiscalCredentials = body;
+        return _json(fiscalStatus);
+      case ('DELETE', '/api/admin/fiscal/account'):
+        fiscalCredentials = null;
+        return _json(fiscalStatus);
+      case ('POST', '/api/admin/fiscal/check'):
+        return _json({
+          'ok': fiscalCredentials != null,
+          'message': 'Ambiente di prova: credenziali corrette',
+          ...fiscalStatus,
         });
       case ('GET', '/api/staff/orders'):
         return _json({
@@ -305,6 +344,7 @@ class FakeServer {
       );
     }
     if (req.method == 'POST' && path.endsWith('/mark-paid')) {
+      payments.add(body);
       return _json(
         update(
           segments[3],

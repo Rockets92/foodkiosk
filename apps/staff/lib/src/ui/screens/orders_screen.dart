@@ -487,6 +487,13 @@ class _OrderDetailState extends State<_OrderDetail> {
     }
   }
 
+  /// Cancelled with a documento commerciale whose void failed.
+  bool get _voidPending =>
+      order.status == OrderStatus.cancelled &&
+      order.fiscalDocument != null &&
+      order.fiscalVoid == null &&
+      order.history.any((e) => e.type == 'fiscalVoidFailed');
+
   /// Unpaid, at the till, not yet in the kitchen: items can still change.
   bool get _canEdit =>
       order.status == OrderStatus.open &&
@@ -498,6 +505,7 @@ class _OrderDetailState extends State<_OrderDetail> {
     final payment = await showPaymentDialog(
       context,
       totalCents: order.totalCents,
+      fiscal: _issueFiscal,
     );
     if (payment == null || !mounted) return;
     await _run(
@@ -513,7 +521,10 @@ class _OrderDetailState extends State<_OrderDetail> {
     final ok = await confirm(
       context,
       title: 'Annullare l\'ordine ${orderNumber(order.number)}?',
-      message: order.paymentStatus == PaymentStatus.paid
+      message: order.fiscalDocument != null
+          ? 'L\'ordine risulta pagato: verrà emesso il documento commerciale '
+                'di annullo. Ricordati di rimborsare il cliente.'
+          : order.paymentStatus == PaymentStatus.paid
           ? 'L\'ordine risulta pagato: ricordati di rimborsare il cliente.'
           : 'L\'ordine sparirà dalla cucina e dallo schermo ritiro.',
       confirmLabel: 'Annulla ordine',
@@ -580,6 +591,19 @@ class _OrderDetailState extends State<_OrderDetail> {
                       _run(
                         () => api.runAction(order.id, a),
                         '${flowActionLabel(a)}: eseguito di nuovo',
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 18),
+                ],
+                if (_voidPending) ...[
+                  _VoidFailedBox(
+                    busy: _busy,
+                    onRetry: () {
+                      final api = context.staffRead.api;
+                      _run(
+                        () => api.retryFiscalVoid(order.id),
+                        'Documento annullato',
                       );
                     },
                   ),
@@ -705,6 +729,43 @@ class _OrderDetailState extends State<_OrderDetail> {
 
   static String _rate(double r) =>
       r == r.roundToDouble() ? r.toInt().toString() : r.toString();
+}
+
+class _VoidFailedBox extends StatelessWidget {
+  final bool busy;
+  final VoidCallback onRetry;
+  const _VoidFailedBox({required this.busy, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const ValueKey('void-failed'),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: S.danger.withValues(alpha: 0.07),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: S.danger.withValues(alpha: 0.3)),
+    ),
+    child: Row(
+      children: [
+        Icon(Icons.receipt_long_rounded, color: S.danger),
+        const SizedBox(width: 10),
+        const Expanded(
+          child: Text(
+            'Il documento commerciale non è stato annullato: senza annullo '
+            'la vendita resta nei corrispettivi del giorno.',
+            style: ST.body,
+          ),
+        ),
+        const SizedBox(width: 10),
+        OutlinedButton.icon(
+          key: const ValueKey('retry-void'),
+          onPressed: busy ? null : onRetry,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('Riprova annullo'),
+        ),
+      ],
+    ),
+  );
 }
 
 class _FailedBox extends StatelessWidget {
@@ -873,7 +934,18 @@ class _InfoGrid extends StatelessWidget {
           ].join(' · '),
         ),
       if (order.fiscalDocument case final doc?)
-        (Icons.receipt_rounded, 'Documento fiscale', doc.number),
+        (
+          Icons.receipt_rounded,
+          'Documento commerciale',
+          [
+            'N. ${doc.number}',
+            if (doc.test) 'prova',
+            if (doc.lotteryCode case final l?) 'lotteria $l',
+            if (doc.customerTaxCode case final cf?) 'C.F. $cf',
+          ].join(' · '),
+        ),
+      if (order.fiscalVoid case final doc?)
+        (Icons.receipt_long_rounded, 'Annullo', 'N. ${doc.number}'),
       (
         Icons.soup_kitchen_rounded,
         'Cucina',
@@ -993,6 +1065,12 @@ class _HistoryTile extends StatelessWidget {
         S.danger,
       ),
       'refundRequired' => ('Da rimborsare', S.danger),
+      'fiscalIssued' => ('Documento commerciale N. ${e.detail}', S.success),
+      'fiscalVoided' => ('Documento di annullo N. ${e.detail}', S.success),
+      'fiscalVoidFailed' => (
+        'Annullo del documento non riuscito: ${e.detail}',
+        S.danger,
+      ),
       'completed' => ('Completato', S.success),
       final t when t.startsWith('kitchen.') => (
         'Cucina: ${kitchenStatusLabel(KitchenStatus.parse(t.substring(8))).$1}',

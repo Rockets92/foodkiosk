@@ -11,6 +11,7 @@ import '../widgets/common.dart';
 import 'settings/appearance_section.dart';
 import 'settings/devices_section.dart';
 import 'settings/discounts_section.dart';
+import 'settings/fiscal_section.dart';
 import 'settings/flow_section.dart';
 import 'settings/general_sections.dart';
 import 'settings/network_section.dart';
@@ -31,6 +32,7 @@ enum _Part {
   appearance('Aspetto', Icons.palette_rounded),
   flow('Flusso ordine', Icons.alt_route_rounded),
   discounts('Codici sconto', Icons.local_offer_rounded),
+  fiscal('Agenzia Entrate', Icons.account_balance_rounded),
   devices('Dispositivi', Icons.devices_other_rounded),
   network('Rete', Icons.lan_rounded),
   security('Sicurezza', Icons.lock_rounded);
@@ -51,7 +53,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Map<String, FlowConfig> _presets = FlowConfig.presets;
   Map<String, List<String>> _adapters = const {
     'payment': ['none', 'demo'],
-    'fiscal': ['none', 'demo'],
+    'fiscal': ['none', 'demo', 'epsonRt', 'adeOnline'],
     'printer': ['none', 'demo'],
   };
   List<FlowIssue> _issues = [];
@@ -150,10 +152,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         context,
         title: 'Passare in produzione?',
         message:
-            'I pagamenti useranno il POS e i documenti fiscali il '
-            'registratore configurati in "Dispositivi". Verifica che siano '
-            'collegati e impostati prima di salvare: senza, il totem non '
-            'potrà incassare.',
+            'I pagamenti useranno il POS configurato in "Dispositivi" e i '
+            'documenti fiscali il sistema scelto in "Agenzia Entrate" '
+            '(registratore o documento commerciale online). Verifica che '
+            'siano collegati e impostati prima di salvare: senza, il totem '
+            'non potrà incassare.',
         confirmLabel: 'Disattiva demo',
       );
       if (!ok) return;
@@ -250,6 +253,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _Part.discounts: DiscountsSection(
         value: s.discounts,
         onChanged: (d) => _set('discounts', d.toJson()),
+      ),
+      _Part.fiscal: FiscalSection(
+        s: s,
+        adapters: _adapters,
+        api: context.staff.api,
+        set: _set,
       ),
       _Part.devices: DevicesSection(
         s: s,

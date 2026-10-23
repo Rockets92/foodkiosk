@@ -147,6 +147,46 @@ class StaffApi {
     };
   }
 
+  // Agenzia delle Entrate ------------------------------------------------
+
+  Future<FiscalAccountStatus> fiscalAccount() async =>
+      FiscalAccountStatus.fromJson(
+        await _map('GET', '/api/admin/fiscal/account'),
+      );
+
+  /// Stores the Fisconline credentials (encrypted on the server). Empty
+  /// fields keep what is stored.
+  Future<FiscalAccountStatus> saveFiscalAccount({
+    String? taxCode,
+    String? password,
+    String? pin,
+  }) async => FiscalAccountStatus.fromJson(
+    await _map(
+      'PUT',
+      '/api/admin/fiscal/account',
+      body: {'taxCode': ?taxCode, 'password': ?password, 'pin': ?pin},
+    ),
+  );
+
+  Future<FiscalAccountStatus> disconnectFiscalAccount() async =>
+      FiscalAccountStatus.fromJson(
+        await _map('DELETE', '/api/admin/fiscal/account'),
+      );
+
+  /// Logs in with the configured device; `(ok, message, status)`.
+  Future<(bool, String, FiscalAccountStatus)> checkFiscal() async {
+    final json = await _map('POST', '/api/admin/fiscal/check');
+    return (
+      json['ok'] as bool? ?? false,
+      json['message'] as String? ?? '',
+      FiscalAccountStatus.fromJson(json),
+    );
+  }
+
+  /// Voids again the fiscal document of a cancelled order.
+  Future<Order> retryFiscalVoid(String id) async =>
+      Order.fromJson(await _map('POST', '/api/staff/orders/$id/fiscal-void'));
+
   // Menu -------------------------------------------------------------------
 
   Future<Menu> menu() async =>
@@ -398,12 +438,17 @@ class CounterPayment {
   final Cents? cardCents;
   final Cents? receivedCents;
 
-  const CounterPayment.cash({this.receivedCents})
-    : method = 'cash',
-      cashCents = null,
-      cardCents = null;
+  /// Lottery code or tax code the customer wants on the fiscal document.
+  final FiscalCustomer customer;
 
-  const CounterPayment.card()
+  const CounterPayment.cash({
+    this.receivedCents,
+    this.customer = const FiscalCustomer(),
+  }) : method = 'cash',
+       cashCents = null,
+       cardCents = null;
+
+  const CounterPayment.card({this.customer = const FiscalCustomer()})
     : method = 'card',
       cashCents = null,
       cardCents = null,
@@ -412,14 +457,68 @@ class CounterPayment {
   const CounterPayment.mixed({
     required Cents this.cashCents,
     required Cents this.cardCents,
+    this.customer = const FiscalCustomer(),
   }) : method = 'mixed',
        receivedCents = null;
 
+  /// Amounts and fiscal requests, as the server takes them.
   Map<String, Object?> get amounts => {
     'cashCents': ?cashCents,
     'cardCents': ?cardCents,
     'receivedCents': ?receivedCents,
+    if (!customer.isEmpty) 'fiscalCustomer': customer.toJson(),
   };
+}
+
+/// The Agenzia delle Entrate account as the server reports it: never the
+/// credentials, only whether they are there and when they expire.
+class FiscalAccountStatus {
+  final bool connected;
+
+  /// Stored, but they cannot be opened (the key file changed).
+  final bool unreadable;
+  final String? taxCode;
+  final DateTime? updatedAt;
+  final DateTime? passwordExpiresAt;
+  final int? daysLeft;
+  final bool renewSoon;
+  final bool expired;
+  final bool? lastCheckOk;
+  final String? lastCheckMessage;
+  final DateTime? lastCheckAt;
+
+  const FiscalAccountStatus({
+    this.connected = false,
+    this.unreadable = false,
+    this.taxCode,
+    this.updatedAt,
+    this.passwordExpiresAt,
+    this.daysLeft,
+    this.renewSoon = false,
+    this.expired = false,
+    this.lastCheckOk,
+    this.lastCheckMessage,
+    this.lastCheckAt,
+  });
+
+  factory FiscalAccountStatus.fromJson(Map<String, Object?> json) {
+    final a = (json['account'] as Map? ?? const {}).cast<String, Object?>();
+    final check = (a['lastCheck'] as Map?)?.cast<String, Object?>();
+    DateTime? date(Object? v) => v is String ? DateTime.tryParse(v) : null;
+    return FiscalAccountStatus(
+      connected: a['connected'] as bool? ?? false,
+      unreadable: a['unreadable'] as bool? ?? false,
+      taxCode: a['taxCode'] as String?,
+      updatedAt: date(a['updatedAt']),
+      passwordExpiresAt: date(a['passwordExpiresAt']),
+      daysLeft: a['daysLeft'] as int?,
+      renewSoon: a['renewSoon'] as bool? ?? false,
+      expired: a['expired'] as bool? ?? false,
+      lastCheckOk: check?['ok'] as bool?,
+      lastCheckMessage: check?['message'] as String?,
+      lastCheckAt: date(check?['at']),
+    );
+  }
 }
 
 /// What the server PC reports about the local network.

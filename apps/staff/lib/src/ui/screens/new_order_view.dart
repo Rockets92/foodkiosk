@@ -194,6 +194,10 @@ class _NewOrderViewState extends State<NewOrderView> {
     discountCode: _discount?.ok ?? false ? _coupon!.code : null,
   );
 
+  static bool _fiscalOnPayment(StaffSession session) => session.settings.flow
+      .actionsFor(FlowEvent.paid)
+      .contains(FlowAction.issueFiscalDocument);
+
   /// Saves the order and, with [pay], asks for the payment and cashes it.
   Future<void> _save({required bool pay}) async {
     final session = context.staffRead;
@@ -201,7 +205,11 @@ class _NewOrderViewState extends State<NewOrderView> {
     final total = _total;
     CounterPayment? payment;
     if (pay) {
-      payment = await showPaymentDialog(context, totalCents: total);
+      payment = await showPaymentDialog(
+        context,
+        totalCents: total,
+        fiscal: _issueFiscal && _fiscalOnPayment(session),
+      );
       if (payment == null || !mounted) return;
     }
     setState(() => _busy = true);
@@ -255,9 +263,7 @@ class _NewOrderViewState extends State<NewOrderView> {
     final products = category == null
         ? const <Product>[]
         : session.menu.productsIn(category.id).where((p) => p.enabled).toList();
-    final fiscalOnPayment = settings.flow
-        .actionsFor(FlowEvent.paid)
-        .contains(FlowAction.issueFiscalDocument);
+    final fiscalOnPayment = _fiscalOnPayment(session);
     final codes = settings.discounts.onCounter;
 
     return ScannerListener(

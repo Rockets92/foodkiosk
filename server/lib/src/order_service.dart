@@ -1,5 +1,6 @@
 import 'package:kiosk_core/kiosk_core.dart';
 
+import 'adapters/fiscal.dart';
 import 'adapters/printer.dart';
 import 'database.dart';
 import 'discount_service.dart';
@@ -72,6 +73,7 @@ class OrderService {
     Cents? cardCents,
     Cents? receivedCents,
     bool issueFiscal = true,
+    FiscalCustomer fiscalCustomer = const FiscalCustomer(),
   }) async {
     final s = _s;
     if (req.lines.isEmpty) {
@@ -122,6 +124,7 @@ class OrderService {
             cardCents: cardCents,
             receivedCents: receivedCents,
           );
+    if (payment != null) _checkFiscalCustomer(fiscalCustomer, payment);
 
     final order = _db.transaction(() {
       final now = _clock();
@@ -144,6 +147,9 @@ class OrderService {
             isDemo: s.demoMode,
             origin: origin,
             discount: discount,
+            fiscalCustomer: payment == null
+                ? const FiscalCustomer()
+                : fiscalCustomer,
           ).withEvent(
             origin == OrderOrigin.counter ? 'createdAtCounter' : 'created',
             at: now,
@@ -161,13 +167,27 @@ class OrderService {
           .withEvent('paid', detail: payMethod),
     );
     final submitted = s.flow.actionsFor(FlowEvent.submitted);
-    paid = await _runEvent(paid, FlowEvent.submitted);
+    // Paid on the spot: the fiscal document comes first so that, when the
+    // suite prints it, it is the customer's only ticket.
+    if (issueFiscal &&
+        s.flow
+            .actionsFor(FlowEvent.paid)
+            .contains(FlowAction.issueFiscalDocument)) {
+      paid = await _execute(paid, FlowAction.issueFiscalDocument);
+    }
+    final documentPrinted = _printedOwnDocument(paid);
+    paid = await _runEvent(
+      paid,
+      FlowEvent.submitted,
+      skip: {if (documentPrinted) FlowAction.printCustomerTicket},
+    );
     paid = await _runEvent(
       paid,
       FlowEvent.paid,
       skip: {
-        if (!issueFiscal) FlowAction.issueFiscalDocument,
-        if (submitted.contains(FlowAction.printCustomerTicket))
+        FlowAction.issueFiscalDocument,
+        if (documentPrinted ||
+            submitted.contains(FlowAction.printCustomerTicket))
           FlowAction.printCustomerTicket,
       },
     );
@@ -410,6 +430,7 @@ class OrderService {
     Cents? cardCents,
     Cents? receivedCents,
     bool issueFiscal = true,
+    FiscalCustomer fiscalCustomer = const FiscalCustomer(),
   }) async {
     var order = get(id);
     if (order.status != OrderStatus.open) {
@@ -430,9 +451,14 @@ class OrderService {
       cardCents: cardCents,
       receivedCents: receivedCents,
     );
+    _checkFiscalCustomer(fiscalCustomer, payment);
     order = _save(
       order
-          .copyWith(paymentStatus: PaymentStatus.paid, payment: payment)
+          .copyWith(
+            paymentStatus: PaymentStatus.paid,
+            payment: payment,
+            fiscalCustomer: fiscalCustomer,
+          )
           .withEvent('paid', detail: method),
     );
     return _complete(
@@ -479,6 +505,23 @@ class OrderService {
       cardCents: card,
       receivedCents: receivedCents,
     );
+  }
+
+  /// The lottery code and the buyer's tax code asked for at the till.
+  void _checkFiscalCustomer(FiscalCustomer c, PaymentInfo payment) {
+    final errors = c.validate();
+    if (errors.isNotEmpty) {
+      throw ApiException.badRequest('invalidFiscalCustomer', errors.first);
+    }
+    // The receipts lottery only takes electronic payments.
+    if (c.lotteryCode != null &&
+        payment.provider != 'card' &&
+        (payment.cardCents ?? 0) == 0) {
+      throw ApiException.badRequest(
+        'lotteryNeedsCard',
+        'The lottery code needs a payment made, at least in part, by card.',
+      );
+    }
   }
 
   /// Changes the items of an order still waiting at the till and not yet
@@ -714,6 +757,61 @@ class OrderService {
       _returnStock(order);
       if (discount != null) _discounts.release(discount.codeId);
     });
+    if (order.fiscalDocument != null) order = await _voidFiscal(order);
+    return order;
+  }
+
+  /// Voids the fiscal document of a cancelled order again, after a failure
+  /// (provider offline, credentials expired).
+  Future<Order> retryFiscalVoid(String id) async {
+    final order = get(id);
+    if (order.status != OrderStatus.cancelled || order.fiscalDocument == null) {
+      throw ApiException.conflict(
+        'nothingToVoid',
+        'Only cancelled orders with a fiscal document can be voided.',
+      );
+    }
+    if (order.fiscalVoid != null) {
+      throw ApiException.conflict(
+        'alreadyVoided',
+        'The fiscal document was already voided.',
+      );
+    }
+    return _voidFiscal(order);
+  }
+
+  /// Issues the "documento commerciale di annullo" and, when the device
+  /// does not print it, prints it at the till. A failure is recorded and
+  /// can be retried with [retryFiscalVoid].
+  Future<Order> _voidFiscal(Order order) async {
+    final sale = order.fiscalDocument!;
+    try {
+      final device = sale.provider == 'demo'
+          ? DemoFiscalDevice(printsDocument: sale.printedByDevice)
+          : _settings.fiscal;
+      if (device.type != sale.provider) {
+        throw FiscalException(
+          'Il documento è stato emesso con un altro dispositivo '
+          '(${sale.provider}): annullalo da lì',
+        );
+      }
+      final doc = await device.voidDocument(order);
+      order = _save(
+        order
+            .copyWith(fiscalVoid: doc)
+            .withEvent('fiscalVoided', detail: doc.number),
+      );
+      if (!doc.printedByDevice) {
+        await _print(
+          order,
+          'fiscal',
+          _settings.counterPrinter,
+          voidCommercialDocument(order, _s),
+        );
+      }
+    } catch (e) {
+      order = _save(order.withEvent('fiscalVoidFailed', detail: '$e'));
+    }
     return order;
   }
 
@@ -746,12 +844,37 @@ class OrderService {
     FlowEvent event, {
     Set<FlowAction> skip = const {},
   }) async {
-    for (final action in _s.flow.actionsFor(event)) {
+    final actions = [..._s.flow.actionsFor(event)];
+    // The fiscal document comes first: when the suite prints it, it is the
+    // customer's ticket, and the plain ticket is not printed as well.
+    if (actions.remove(FlowAction.issueFiscalDocument)) {
+      actions.insert(0, FlowAction.issueFiscalDocument);
+    }
+    var documentPrinted = false;
+    for (final action in actions) {
       if (skip.contains(action)) continue;
+      if (action == FlowAction.printCustomerTicket && documentPrinted) continue;
+      final hadDocument = order.fiscalDocument != null;
       order = await _execute(order, action);
+      if (action == FlowAction.issueFiscalDocument && !hadDocument) {
+        documentPrinted = _printedOwnDocument(order);
+      }
     }
     return order;
   }
+
+  /// The suite has just printed the order's documento commerciale: the
+  /// last action, issuing it, succeeded print included.
+  bool _printedOwnDocument(Order order) =>
+      order.fiscalDocument?.printedByDevice == false &&
+      order.history.lastOrNull?.type == 'action' &&
+      order.history.last.detail == FlowAction.issueFiscalDocument.name;
+
+  /// Fiscal documents of orders paid at the till come out at the till.
+  TicketPrinter _fiscalPrinter(Order order) =>
+      order.paymentMode == PaymentMode.counter
+      ? _settings.counterPrinter
+      : _settings.customerPrinter;
 
   Future<Order> _execute(
     Order order,
@@ -762,12 +885,26 @@ class OrderService {
     try {
       switch (action) {
         case FlowAction.printCustomerTicket:
-          await _print(
-            order,
-            'customer',
-            _settings.customerPrinter,
-            customerTicket(order, _s),
-          );
+          if (order.fiscalDocument case final doc? when !doc.printedByDevice) {
+            // Reprint of the documento commerciale, at the till when asked
+            // by the staff.
+            final printed = _printJobs
+                .recent(orderId: order.id)
+                .any((j) => j.kind == 'fiscal' && j.status == 'printed');
+            await _print(
+              order,
+              'fiscal',
+              manual ? _settings.counterPrinter : _fiscalPrinter(order),
+              customerTicket(order, _s, reprint: printed),
+            );
+          } else {
+            await _print(
+              order,
+              'customer',
+              _settings.customerPrinter,
+              customerTicket(order, _s),
+            );
+          }
         case FlowAction.printKitchenTicket:
           await _print(
             order,
@@ -782,7 +919,20 @@ class OrderService {
         case FlowAction.issueFiscalDocument:
           if (order.fiscalDocument == null) {
             final doc = await _settings.fiscal.issue(order);
-            order = order.copyWith(fiscalDocument: doc);
+            // Saved before printing: a printer failure must not lose it.
+            order = _save(
+              order
+                  .copyWith(fiscalDocument: doc)
+                  .withEvent('fiscalIssued', detail: doc.number),
+            );
+            if (!doc.printedByDevice) {
+              await _print(
+                order,
+                'fiscal',
+                _fiscalPrinter(order),
+                commercialDocument(order, _s),
+              );
+            }
           }
         case FlowAction.announceOnPickupScreen:
           _bus.emit(ServerEvent.pickupAnnounce, {

@@ -117,5 +117,8 @@ class AppDatabase {
     );
   }
 
+  void deleteSetting(String key) =>
+      db.execute('DELETE FROM settings WHERE key = ?', [key]);
+
   void close() => db.close();
 }

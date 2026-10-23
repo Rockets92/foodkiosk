@@ -9,9 +9,11 @@ environment:
 
 dependencies:
   args: ^2.5.0
+  ffi: ^2.1.0
   kiosk_core:
     path: ../packages/kiosk_core
   path: ^1.9.0
+  pointycastle: ^4.0.0
   shelf: ^1.4.1
   shelf_router: ^1.1.4
   shelf_static: ^1.1.2
