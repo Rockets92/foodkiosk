@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kiosk_app/src/state/cart.dart';
 import 'package:kiosk_app/src/state/kiosk_controller.dart';
 import 'package:kiosk_app/src/ui/kiosk_app.dart';
+import 'package:kiosk_app/src/ui/holiday/decor.dart';
 import 'package:kiosk_app/src/ui/theme.dart';
 import 'package:kiosk_app/src/ui/widgets/pressable.dart';
 import 'package:kiosk_core/kiosk_core.dart';
@@ -376,5 +377,28 @@ void main() {
     expect(K.palette.id, 'berry');
     expect(primary(), Color(ColorPalette.berry.primary));
     expect(k.step, KioskStep.menu, reason: 'the customer keeps their place');
+  });
+
+  testWidgets('a holiday theme decorates the customer screens', (tester) async {
+    final backend = FakeBackend(
+      settings: const KioskSettings(holiday: 'christmas'),
+    );
+    final k = await pumpKiosk(tester, backend);
+    expect(K.holiday?.id, 'christmas');
+    expect(K.palette.id, HolidayTheme.christmas.palette.id);
+    expect(find.byType(HolidayScene), findsOneWidget);
+    expect(find.text('Buon Natale!'), findsOneWidget);
+    expect(find.byType(LogoAccessory), findsOneWidget);
+
+    await goToMenu(tester);
+    expect(find.byType(LogoAccessory), findsOneWidget);
+
+    backend.settingsValue = const KioskSettings();
+    await k.reload();
+    await settle(tester);
+    expect(K.holiday, isNull);
+    expect(K.palette.id, 'classic');
+    expect(find.byType(LogoAccessory), findsNothing);
+    expect(k.step, KioskStep.menu);
   });
 }

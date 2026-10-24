@@ -240,6 +240,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         selected: s.palette,
         venueName: s.venueName,
         onChanged: (id) => _set('palette', id),
+        holiday: s.holiday,
+        onHolidayChanged: (id) => _set('holiday', id),
       ),
       _Part.flow: FlowSection(
         flow: s.flow,

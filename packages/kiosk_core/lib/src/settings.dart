@@ -1,6 +1,7 @@
 import 'discount.dart';
 import 'fiscal.dart';
 import 'flow.dart';
+import 'holiday.dart';
 import 'order.dart';
 import 'palette.dart';
 
@@ -80,6 +81,10 @@ class KioskSettings {
   /// Id of the [ColorPalette] used by the kiosk and the staff app.
   final String palette;
 
+  /// Holiday theme of the customer screens: [HolidayMode.none],
+  /// [HolidayMode.auto] (from the calendar) or the id of a [HolidayTheme].
+  final String holiday;
+
   const KioskSettings({
     this.venueName = 'Food Kiosk',
     this.demoMode = true,
@@ -103,9 +108,18 @@ class KioskSettings {
     this.merchant = const MerchantProfile(),
     this.adminPin = '1234',
     this.palette = 'classic',
+    this.holiday = HolidayMode.none,
   });
 
-  ColorPalette get colors => ColorPalette.byId(palette);
+  /// The holiday theme showing on [now], if any.
+  HolidayTheme? holidayOn(DateTime now) => HolidayMode.resolve(holiday, now);
+
+  /// The colours in use today: those of the holiday theme while one is
+  /// showing, otherwise the venue palette.
+  ColorPalette get colors => colorsOn(DateTime.now());
+
+  ColorPalette colorsOn(DateTime now) =>
+      holidayOn(now)?.palette ?? ColorPalette.byId(palette);
 
   /// Stock is only enforced in production mode.
   bool get enforcesStock => stockTracking && !demoMode;
@@ -134,6 +148,9 @@ class KioskSettings {
     if (adminPin.length < 4) errors.add('The admin PIN needs 4+ characters.');
     if (!ColorPalette.presets.any((p) => p.id == palette)) {
       errors.add('Unknown colour palette "$palette".');
+    }
+    if (!HolidayMode.isValid(holiday)) {
+      errors.add('Unknown holiday theme "$holiday".');
     }
     for (final issue in flow.validate()) {
       if (issue.level == FlowIssueLevel.error) errors.add(issue.message);
@@ -212,6 +229,7 @@ class KioskSettings {
       merchant: MerchantProfile.fromJson(json['merchant']),
       adminPin: json['adminPin'] as String? ?? d.adminPin,
       palette: json['palette'] as String? ?? d.palette,
+      holiday: json['holiday'] as String? ?? d.holiday,
     );
   }
 
@@ -244,5 +262,6 @@ class KioskSettings {
     'counterFallback': counterFallback,
     'discounts': discounts.toJson(),
     'palette': palette,
+    'holiday': holiday,
   };
 }

@@ -6,6 +6,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:kiosk_core/kiosk_core.dart';
 
 import '../../i18n.dart';
+import '../holiday/decor.dart';
 import '../scope.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -65,6 +66,7 @@ class _AttractScreenState extends State<AttractScreen>
         ? null
         : featured[_index % featured.length];
     String money(int c) => formatCents(c, symbol: k.settings.currencySymbol);
+    final holiday = K.holiday;
 
     return GestureDetector(
       key: const ValueKey('attract'),
@@ -83,10 +85,15 @@ class _AttractScreenState extends State<AttractScreen>
                   painter: _SunburstPainter(_spin.value * 2 * pi),
                 ),
               ),
+              if (holiday != null)
+                HolidayScene(
+                  key: ValueKey('holiday-${holiday.id}'),
+                  theme: holiday,
+                ),
               SafeArea(
                 child: Column(
                   children: [
-                    const SizedBox(height: 48),
+                    SizedBox(height: holiday == null ? 48 : 130),
                     const VenueLogo(size: 150).animate().scale(
                       duration: 700.ms,
                       curve: Curves.elasticOut,
@@ -101,6 +108,13 @@ class _AttractScreenState extends State<AttractScreen>
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (holiday != null) ...[
+                      const SizedBox(height: 22),
+                      HolidayGreeting(
+                        theme: holiday,
+                        text: holidayGreeting(t, holiday),
+                      ),
+                    ],
                     Expanded(
                       child: product == null
                           ? const SizedBox()
@@ -164,7 +178,8 @@ class _AttractScreenState extends State<AttractScreen>
                           ),
                         ),
                       ),
-                    const SizedBox(height: 56),
+                    // Holiday artwork stands on the ground below the button.
+                    SizedBox(height: holiday == null ? 56 : 150),
                   ],
                 ),
               ),

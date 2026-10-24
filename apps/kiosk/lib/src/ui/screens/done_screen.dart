@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:kiosk_core/kiosk_core.dart';
 
+import '../holiday/decor.dart';
 import '../scope.dart';
 import '../theme.dart';
 import '../widgets/pressable.dart';
@@ -47,6 +48,7 @@ class _DoneScreenState extends State<DoneScreen>
       PaymentStatus.paid => t('donePaid'),
       _ => t('doneNoPayment'),
     };
+    final holiday = K.holiday;
     return Scaffold(
       key: const ValueKey('done'),
       body: DecoratedBox(
@@ -54,6 +56,11 @@ class _DoneScreenState extends State<DoneScreen>
         child: Stack(
           fit: StackFit.expand,
           children: [
+            if (holiday != null)
+              HolidayScene(
+                key: ValueKey('holiday-${holiday.id}'),
+                theme: holiday,
+              ),
             const _Confetti(),
             SafeArea(
               child: Padding(
@@ -86,6 +93,13 @@ class _DoneScreenState extends State<DoneScreen>
                         fontSize: 80,
                       ),
                     ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.3),
+                    if (holiday != null) ...[
+                      const SizedBox(height: 14),
+                      HolidayGreeting(
+                        theme: holiday,
+                        text: holidayGreeting(t, holiday),
+                      ),
+                    ],
                     const SizedBox(height: 40),
                     _Ticket(order: order, label: t('orderNumber')),
                     const SizedBox(height: 44),
