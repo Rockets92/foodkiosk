@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:kiosk_core/kiosk_core.dart';
 
@@ -45,8 +47,9 @@ class KioskApp extends StatelessWidget {
   }
 }
 
-/// Follows the palette of the server settings, rebuilding the theme only
-/// when it changes.
+/// Follows the palette and the holiday theme of the server settings,
+/// rebuilding the theme only when they change. Checks the calendar now and
+/// then, for the automatic holiday themes.
 class _Themed extends StatefulWidget {
   final KioskController controller;
   final Widget Function(ThemeData theme) builder;
@@ -59,23 +62,31 @@ class _Themed extends StatefulWidget {
 class _ThemedState extends State<_Themed> {
   late ColorPalette _palette = widget.controller.settings.colors;
   late ThemeData _theme = kioskTheme(_palette);
+  Timer? _calendar;
 
   @override
   void initState() {
     super.initState();
+    K.holiday = widget.controller.settings.holidayOn(DateTime.now());
     widget.controller.addListener(_sync);
+    _calendar = Timer.periodic(const Duration(minutes: 10), (_) => _sync());
   }
 
   @override
   void dispose() {
+    _calendar?.cancel();
     widget.controller.removeListener(_sync);
     super.dispose();
   }
 
   void _sync() {
-    final next = widget.controller.settings.colors;
-    if (next.id == _palette.id) return;
+    final now = DateTime.now();
+    final settings = widget.controller.settings;
+    final next = settings.colorsOn(now);
+    final holiday = settings.holidayOn(now);
+    if (next.id == _palette.id && holiday?.id == K.holiday?.id) return;
     setState(() {
+      K.holiday = holiday;
       _palette = next;
       _theme = kioskTheme(next);
     });

@@ -247,6 +247,21 @@ void main() {
     expect(fake.settings.palette, 'midnight');
   });
 
+  testWidgets('settings: a holiday theme is switched on and saved', (
+    tester,
+  ) async {
+    final fake = FakeServer();
+    await openShell(tester, fake, Section.settings);
+    for (final t in HolidayTheme.presets) {
+      expect(find.byKey(ValueKey('holiday-${t.id}')), findsOneWidget);
+    }
+    expect(find.byKey(const ValueKey('holiday-auto')), findsOneWidget);
+    await tapKey(tester, 'holiday-halloween');
+    expect(find.byKey(const ValueKey('holiday-active-notice')), findsOneWidget);
+    await tapKey(tester, 'save-settings');
+    expect(fake.settings.holiday, 'halloween');
+  });
+
   testWidgets('menu: a product can be marked sold out', (tester) async {
     final fake = FakeServer();
     await openShell(tester, fake, Section.menu);

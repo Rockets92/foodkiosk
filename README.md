@@ -90,6 +90,23 @@ restano sempre rossi. Le palette sono in
 `packages/kiosk_core/lib/src/palette.dart`: per aggiungerne una basta un
 nuovo blocco nella lista `presets`.
 
+**Temi delle festività**: nella stessa pagina si accende un tema a tema
+(Capodanno, San Valentino, Carnevale, Pasqua, Estate, Halloween, Natale)
+oppure **Automatico**, che lo sceglie dal calendario (Pasqua e Carnevale
+sono calcolati anno per anno; se due periodi si sovrappongono vince il più
+specifico, es. Capodanno su Natale). Il tema porta i suoi colori al posto
+della palette e decora il totem: festoni o lucine in alto, il logo con il
+cappello di Babbo Natale, il cappello da strega o le orecchie da coniglio,
+un saluto ("Buon Natale!", "Happy Halloween!") nella lingua del cliente,
+illustrazioni animate negli angoli (zucche che brillano, albero e regali,
+coniglio che fa capolino, palma e pallone) e animazioni di sfondo (neve,
+pipistrelli, cuori, coriandoli e stelle filanti, petali, fuochi
+d'artificio, bolle). Le decorazioni stanno su attesa, benvenuto, menu,
+carrello e conferma ordine, mai sopra pulsanti e prezzi. I temi sono in
+`packages/kiosk_core/lib/src/holiday.dart` (colori e date) e
+`holiday_art.dart` (illustrazioni SVG); le animazioni in
+`apps/kiosk/lib/src/ui/holiday/`.
+
 Logo e immagini sono segnaposto: il logo e le illustrazioni dei prodotti
 demo sono serviti dal server (`server/lib/src/illustrations.dart`) finché il
 locale non carica le proprie foto. Il font è Poppins (licenza OFL, incluso). Le
@@ -127,9 +144,9 @@ programma Windows) con accesso tramite PIN staff e una barra laterale:
 - **Sconti**: codici sconto (vedi sotto), con utilizzi, stato, QR code e
   codice a barre da stampare.
 - **Impostazioni**: modalità demo, lingue, "mangio qui / porto via",
-  palette colori con anteprima del totem, flusso dell'ordine con verifica
-  immediata delle combinazioni, dispositivi (POS, registratore telematico,
-  stampanti) e PIN.
+  palette colori con anteprima del totem, temi delle festività, flusso
+  dell'ordine con verifica immediata delle combinazioni, dispositivi (POS,
+  registratore telematico, stampanti) e PIN.
 
 ```sh
 cd apps/staff

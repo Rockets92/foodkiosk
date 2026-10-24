@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:kiosk_core/kiosk_core.dart';
 
 import '../../state/cart.dart';
+import '../holiday/particles.dart';
 import '../scope.dart';
 import '../theme.dart';
 import '../widgets/allergens.dart';
@@ -379,6 +380,10 @@ class _PromoBanner extends StatelessWidget {
                 clipBehavior: Clip.antiAlias,
                 child: Stack(
                   children: [
+                    if (K.holiday case final holiday?)
+                      Positioned.fill(
+                        child: HolidayParticles(theme: holiday, density: 0.3),
+                      ),
                     Positioned(
                       right: -60,
                       top: -60,

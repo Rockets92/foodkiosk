@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
+import '../holiday/decor.dart';
 import '../scope.dart';
 import '../theme.dart';
 import 'net_image.dart';
@@ -12,10 +13,23 @@ class VenueLogo extends StatelessWidget {
   const VenueLogo({super.key, this.size = 160});
 
   @override
-  Widget build(BuildContext context) => SizedBox.square(
-    dimension: size,
-    child: const NetImage('/media/placeholder/logo.svg', recolor: true),
-  );
+  Widget build(BuildContext context) {
+    final logo = SizedBox.square(
+      dimension: size,
+      child: const NetImage('/media/placeholder/logo.svg', recolor: true),
+    );
+    final holiday = K.holiday;
+    if (holiday == null) return logo;
+    final accessory = LogoAccessory(theme: holiday, size: size);
+    final behind = LogoAccessory.behind(holiday);
+    return SizedBox.square(
+      dimension: size,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [if (behind) accessory, logo, if (!behind) accessory],
+      ),
+    );
+  }
 }
 
 /// Pill-shaped language switcher.
