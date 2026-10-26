@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <linearGradient id="bunTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7B860"/><stop offset="1" stop-color="#C96F1C"/></linearGradient>
+    <linearGradient id="red" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#C21807"/><stop offset="0.45" stop-color="#E8331C"/><stop offset="1" stop-color="#B01505"/></linearGradient>
+    <linearGradient id="fry" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE07A"/><stop offset="1" stop-color="#F2B630"/></linearGradient>
+  </defs>
+  <ellipse cx="200" cy="350" rx="170" ry="18" fill="#000" opacity="0.13"/>
+  <path d="M30 290 h340 l-24 50 h-292z" fill="#D62300"/>
+  <path d="M30 290 h340 l-4 10 h-332z" fill="#FF5A3C"/>
+  <rect x="250" y="120" width="12" height="70" rx="5" fill="#fff" transform="rotate(10 256 155)"/>
+  <path d="M220 160 h100 l-12 132 h-76z" fill="url(#red)"/>
+  <rect x="212" y="150" width="116" height="16" rx="7" fill="#F4F4F4"/>
+  <path d="M248 210 q22 -12 44 0 q-22 12 -44 0z" fill="#fff"/>
+  <g>
+    <rect x="96" y="150" width="12" height="100" rx="4" fill="url(#fry)" transform="rotate(-8 102 250)"/>
+    <rect x="112" y="140" width="12" height="110" rx="4" fill="url(#fry)" transform="rotate(-3 118 250)"/>
+    <rect x="128" y="136" width="12" height="114" rx="4" fill="url(#fry)"/>
+    <rect x="144" y="142" width="12" height="108" rx="4" fill="url(#fry)" transform="rotate(4 150 250)"/>
+    <rect x="160" y="152" width="12" height="98" rx="4" fill="url(#fry)" transform="rotate(9 166 250)"/>
+    <path d="M86 190 h100 l-12 100 h-76z" fill="url(#red)"/>
+    <path d="M122 232 l14 -12 l14 12 l-14 12z" fill="#FFC72C"/>
+  </g>
+  <path d="M110 286 h170 q4 0 3 6 q-4 18 -24 18 h-128 q-20 0 -24 -18 q-1 -6 3 -6z" fill="#E5953A"/>
+  <rect x="102" y="264" width="186" height="24" rx="12" fill="#5A2E14"/>
+  <path d="M98 262 h194 l-6 8 l-20 0 l-10 16 l-12 -16 l-50 0 l-12 18 l-12 -18 l-60 0 z" fill="#FFC21A"/>
+  <path d="M100 254 q10 -10 20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t10 0 v10 h-190z" fill="#5DB33C"/>
+  <path d="M98 252 q0 -84 97 -84 q97 0 97 84 q0 8 -10 8 h-174 q-10 0 -10 -8z" fill="url(#bunTop)"/>
+  <ellipse cx="160" cy="200" rx="6" ry="3.5" fill="#FFF3D6"/><ellipse cx="195" cy="190" rx="6" ry="3.5" fill="#FFF3D6"/><ellipse cx="230" cy="202" rx="6" ry="3.5" fill="#FFF3D6"/><ellipse cx="180" cy="222" rx="6" ry="3.5" fill="#FFF3D6"/><ellipse cx="215" cy="226" rx="6" ry="3.5" fill="#FFF3D6"/>
+</svg>

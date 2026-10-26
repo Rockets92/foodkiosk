@@ -1,0 +1,12 @@
+name: foodkiosk_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+workspace:
+  - packages/kiosk_core
+  - server
+
+dev_dependencies:
+  lints: ^6.0.0
