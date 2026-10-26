@@ -153,6 +153,52 @@ void main() {
     expect(ids, hasLength(ColorPalette.presets.length));
   });
 
+  test('holiday themes: calendar windows and Easter', () {
+    expect(HolidayTheme.easterSunday(2026), DateTime(2026, 4, 5));
+    expect(HolidayTheme.easterSunday(2027), DateTime(2027, 3, 28));
+    expect(HolidayTheme.easterSunday(2025), DateTime(2025, 4, 20));
+    String? on(int y, int m, int d) =>
+        HolidayTheme.forDate(DateTime(y, m, d, 15))?.id;
+    expect(on(2026, 10, 24), 'halloween');
+    expect(on(2026, 11, 2), 'halloween');
+    expect(on(2026, 11, 3), isNull);
+    expect(on(2026, 12, 10), 'christmas');
+    expect(on(2026, 12, 31), 'newYear', reason: 'more specific wins');
+    expect(on(2027, 1, 1), 'newYear');
+    expect(on(2027, 1, 5), 'christmas', reason: 'until the Epiphany');
+    expect(on(2027, 2, 14), 'valentine');
+    expect(on(2027, 2, 9), 'carnival', reason: 'martedì grasso 2027');
+    expect(on(2027, 2, 10), 'valentine');
+    expect(on(2027, 2, 4), 'carnival', reason: 'giovedì grasso');
+    expect(on(2027, 1, 20), isNull);
+    expect(on(2027, 3, 29), 'easter', reason: 'Pasquetta');
+    expect(on(2027, 7, 15), 'summer');
+    final ids = {for (final t in HolidayTheme.presets) t.id};
+    expect(ids, hasLength(HolidayTheme.presets.length));
+    for (final t in HolidayTheme.presets) {
+      expect(HolidayArt.hero(t.id), contains('<svg'));
+      expect(HolidayArt.accessory(t.id), contains('<svg'));
+    }
+  });
+
+  test('a holiday theme travels with the settings and wins the palette', () {
+    const s = KioskSettings(palette: 'fresh', holiday: 'christmas');
+    expect(s.toPublicJson()['holiday'], 'christmas');
+    expect(KioskSettings.fromJson(s.toJson()).holiday, 'christmas');
+    final now = DateTime(2026, 7, 1);
+    expect(s.holidayOn(now)?.id, 'christmas', reason: 'kept on by hand');
+    expect(s.colorsOn(now), HolidayTheme.christmas.palette);
+    const auto = KioskSettings(palette: 'fresh', holiday: HolidayMode.auto);
+    expect(auto.holidayOn(DateTime(2026, 10, 31))?.id, 'halloween');
+    expect(auto.colorsOn(DateTime(2026, 9, 15)), ColorPalette.fresh);
+    expect(const KioskSettings().holiday, HolidayMode.none);
+    expect(
+      const KioskSettings(holiday: 'ferragosto').validate(),
+      contains(contains('holiday')),
+    );
+    expect(auto.validate(), isEmpty);
+  });
+
   test('artwork colours follow the palette', () {
     const p = ColorPalette.ocean;
     expect(p.recolor(0xFFD62300), p.primary);

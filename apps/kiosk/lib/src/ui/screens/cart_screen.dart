@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:kiosk_core/kiosk_core.dart';
 
+import '../holiday/particles.dart';
 import '../scope.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -18,74 +19,84 @@ class CartScreen extends StatelessWidget {
     final t = context.t;
     return Scaffold(
       key: const ValueKey('cart'),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(28, 20, 28, 12),
-              child: Row(
-                children: [
-                  RoundButton(
-                    key: const ValueKey('cart-back'),
-                    icon: Icons.arrow_back_rounded,
-                    size: 72,
-                    onTap: k.busy ? null : k.backToMenu,
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(child: Text(t('yourOrder'), style: KText.h1)),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: K.shadow,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          k.serviceMode == ServiceMode.eatIn
-                              ? Icons.restaurant_rounded
-                              : Icons.shopping_bag_rounded,
-                          color: K.primary,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (K.holiday case final holiday?)
+            HolidayParticles(theme: holiday, onLight: true, density: 0.6),
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 20, 28, 12),
+                  child: Row(
+                    children: [
+                      RoundButton(
+                        key: const ValueKey('cart-back'),
+                        icon: Icons.arrow_back_rounded,
+                        size: 72,
+                        onTap: k.busy ? null : k.backToMenu,
+                      ),
+                      const SizedBox(width: 20),
+                      Expanded(child: Text(t('yourOrder'), style: KText.h1)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 10,
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          t(k.serviceMode.name),
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: K.shadow,
                         ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: k.cart.isEmpty
-                  ? _Empty()
-                  : ListView(
-                      padding: const EdgeInsets.fromLTRB(28, 12, 28, 24),
-                      children: [
-                        for (var i = 0; i < k.cart.length; i++)
-                          _CartLineTile(
-                            key: ValueKey(
-                              'line-${k.cart[i].productId}-${k.cart[i].optionIds.join()}',
+                        child: Row(
+                          children: [
+                            Icon(
+                              k.serviceMode == ServiceMode.eatIn
+                                  ? Icons.restaurant_rounded
+                                  : Icons.shopping_bag_rounded,
+                              color: K.primary,
                             ),
-                            index: i,
-                          ).animate().fadeIn(delay: (60 * i).ms).slideX(begin: 0.1),
-                        const SizedBox(height: 20),
-                        const _Upsell(),
-                      ],
-                    ),
+                            const SizedBox(width: 8),
+                            Text(
+                              t(k.serviceMode.name),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: k.cart.isEmpty
+                      ? _Empty()
+                      : ListView(
+                          padding: const EdgeInsets.fromLTRB(28, 12, 28, 24),
+                          children: [
+                            for (var i = 0; i < k.cart.length; i++)
+                              _CartLineTile(
+                                    key: ValueKey(
+                                      'line-${k.cart[i].productId}-${k.cart[i].optionIds.join()}',
+                                    ),
+                                    index: i,
+                                  )
+                                  .animate()
+                                  .fadeIn(delay: (60 * i).ms)
+                                  .slideX(begin: 0.1),
+                            const SizedBox(height: 20),
+                            const _Upsell(),
+                          ],
+                        ),
+                ),
+                const _CheckoutPanel(),
+              ],
             ),
-            const _CheckoutPanel(),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

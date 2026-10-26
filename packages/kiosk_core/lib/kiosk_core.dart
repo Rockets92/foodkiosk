@@ -9,6 +9,8 @@ export 'src/discount.dart';
 export 'src/events.dart';
 export 'src/fiscal.dart';
 export 'src/flow.dart';
+export 'src/holiday.dart';
+export 'src/holiday_art.dart';
 export 'src/localized_text.dart';
 export 'src/menu.dart';
 export 'src/money.dart';

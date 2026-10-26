@@ -8,6 +8,9 @@ import 'package:kiosk_core/kiosk_core.dart';
 abstract final class K {
   static ColorPalette palette = ColorPalette.fallback;
 
+  /// Holiday decorations showing on the customer screens, if any.
+  static HolidayTheme? holiday;
+
   static Color get primary => Color(palette.primary);
   static Color get primaryDark => Color(palette.primaryDark);
   static Color get accent => Color(palette.accent);
